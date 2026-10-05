@@ -1,0 +1,119 @@
+server:
+  port: ${PORT:8080}
+
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/crimelens_db}
+    username: ${DB_USERNAME:crimelens_user}
+    password: ${DB_PASSWORD:crimelens_pass}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+  elasticsearch:
+    uris: ${ELASTICSEARCH_URIS:http://localhost:9200}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: crimelens-group
+  cache:
+    type: redis
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:your_jwt_secret_key_change_me_in_production}
+    expiration-ms: 86400000
+  ai-service:
+    url: ${AI_SERVICE_URL:http://localhost:8000}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics,env,loggers
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when-authorized
+      show-components: always
+    prometheus:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    tags:
+      application: crimelens
+      environment: ${ENVIRONMENT:development}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      percentiles:
+        http.server.requests: 0.5, 0.95, 0.99
+      slo:
+        http.server.requests: 100ms, 500ms, 1s, 2s
+  info:
+    env:
+      enabled: true
+    java:
+      enabled: true
+    build:
+      enabled: true
+
+info:
+  app:
+    name: CrimeLens Backend
+    version: 1.0.0
+    description: Real-Time Cybercrime Intelligence Platform
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+ingestion:
+  certIn:
+    feedUrl: ${CERT_IN_FEED_URL:https://www.cert-in.org.in/RSS.jsp}
+    fixedDelay: ${CERT_IN_DELAY:900000}
+    initialDelay: 10000
+  cybercrimeGov:
+    baseUrl: ${CYBERCRIME_GOV_URL:https://cybercrime.gov.in}
+    fixedDelay: ${CYBERCRIME_GOV_DELAY:1800000}
+    initialDelay: 20000
+  twitter:
+    enabled: ${TWITTER_INGESTION_ENABLED:false}
+    bearerToken: ${TWITTER_BEARER_TOKEN:}
+    keywords: ${TWITTER_KEYWORDS:UPI fraud,phishing India,KYC scam,OTP fraud,cyber fraud India,cybercrime alert India}
+    fixedDelay: ${TWITTER_DELAY:900000}
+    initialDelay: 30000
+
+dedup:
+  bloomFilter:
+    key: ${BLOOM_FILTER_KEY:crimelens:bloom:threats}
+    expectedInsertions: ${BLOOM_EXPECTED_INSERTIONS:1000000}
+    falsePositiveProbability: ${BLOOM_FPP:0.01}
+
+ai:
+  service:
+    url: ${AI_SERVICE_URL:http://localhost:8000}

@@ -1,0 +1,354 @@
+# ============================================================
+# CrimeLens — Complete Docker Compose Stack
+# Phases 1-10: Infrastructure + Application + Monitoring
+# ============================================================
+# infra/
+# ├── prometheus/
+# │   ├── prometheus.yml
+# │   └── rules/
+# │       ├── crimelens_alerts.yml
+# │       └── recording_rules.yml
+# ├── grafana/
+# │   ├── grafana.ini
+# │   └── provisioning/
+# │       ├── datasources/prometheus.yml
+# │       └── dashboards/
+# │           ├── dashboard.yml
+# │           └── json/
+# │               ├── crimelens_overview.json
+# │               └── crimelens_threats.json
+# └── alertmanager/
+#     └── config.yml
+# ============================================================
+
+networks:
+  crimelens-net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  kafka_data:
+  zookeeper_data:
+  zookeeper_logs:
+  prometheus_data:
+  grafana_data:
+  elasticsearch_data:
+
+services:
+
+  # ── Infrastructure ────────────────────────────────────────────
+
+  postgres:
+    image: postgis/postgis:15-3.3
+    platform: linux/amd64
+    container_name: crimelens-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-${DB_NAME:-crimelens_db}}
+      POSTGRES_USER: ${POSTGRES_USER:-${DB_USER:-crimelens_user}}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-${DB_PASSWORD:-crimelens_pass}}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_HOST_PORT:-5433}:5432"
+    networks:
+      - crimelens-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-${DB_USER:-crimelens_user}}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis/redis-stack:latest
+    container_name: crimelens-redis
+    ports:
+      - "6379:6379"
+      - "8001:8001"
+    volumes:
+      - redis_data:/data
+    networks:
+      - crimelens-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.1
+    container_name: crimelens-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_logs:/var/lib/zookeeper/log
+    networks:
+      - crimelens-net
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "2181"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: crimelens-kafka
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      KAFKA_JMX_PORT: 9999
+      KAFKA_JMX_HOSTNAME: kafka
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    ports:
+      - "9092:9092"
+      - "9999:9999"
+    networks:
+      - crimelens-net
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.18.1
+    container_name: crimelens-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+      - bootstrap.memory_lock=true
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+    networks:
+      - crimelens-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+
+  # ── Application ───────────────────────────────────────────────
+
+  ai-service:
+    build:
+      context: ./ai-service
+      dockerfile: Dockerfile
+    container_name: crimelens-ai-service
+    environment:
+      - MODEL_NAME=${MODEL_NAME:-xlm-roberta-base}
+      - MODEL_CACHE_DIR=/app/model_cache
+      - CONFIDENCE_THRESHOLD=${CONFIDENCE_THRESHOLD:-0.60}
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+      - ENABLE_TRANSFORMER=${ENABLE_TRANSFORMER:-false}
+      - ENABLE_IMAGE_MODELS=${ENABLE_IMAGE_MODELS:-false}
+    volumes:
+      - ./ai-service/model_cache:/app/model_cache
+    ports:
+      - "8000:8000"
+    networks:
+      - crimelens-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 60s
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: crimelens-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      ai-service:
+        condition: service_healthy
+    environment:
+      - DB_URL=jdbc:postgresql://postgres:5432/${POSTGRES_DB:-${DB_NAME:-crimelens_db}}
+      - DB_USERNAME=${POSTGRES_USER:-${DB_USER:-crimelens_user}}
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-${DB_PASSWORD:-crimelens_pass}}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - ELASTICSEARCH_URIS=http://elasticsearch:9200
+      - AI_SERVICE_URL=http://ai-service:8000
+      - JWT_SECRET=${JWT_SECRET:-changeme_in_production_min32chars}
+      - TWITTER_INGESTION_ENABLED=${TWITTER_ENABLED:-false}
+      - TWITTER_BEARER_TOKEN=${TWITTER_BEARER_TOKEN:-}
+      - CERT_IN_FEED_URL=${CERT_IN_FEED_URL:-https://www.cert-in.org.in/RSS.jsp}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
+      - JAVA_OPTS=-Xms256m -Xmx512m
+      - SPRING_FLYWAY_BASELINE_ON_MIGRATE=true
+      - SPRING_FLYWAY_BASELINE_VERSION=0
+      - SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE=10MB
+      - SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE=11MB
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - MANAGEMENT_HEALTH_MAIL_ENABLED=${MAIL_HEALTH_ENABLED:-false}
+      - MAIL_HOST=${MAIL_HOST:-smtp.gmail.com}
+      - MAIL_PORT=${MAIL_PORT:-587}
+      - MAIL_USERNAME=${MAIL_USERNAME:-}
+      - MAIL_PASSWORD=${MAIL_PASSWORD:-}
+    ports:
+      - "8080:8080"
+    networks:
+      - crimelens-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 45s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: /
+        VITE_WS_URL: /ws
+    container_name: crimelens-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - crimelens-net
+
+  # ── Exporters ─────────────────────────────────────────────────
+
+  kafka-exporter:
+    image: danielqsj/kafka-exporter:latest
+    container_name: crimelens-kafka-exporter
+    command:
+      - '--kafka.server=kafka:29092'
+      - '--topic.filter=raw-threats|classified-threats'
+    ports:
+      - "9308:9308"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - crimelens-net
+    restart: unless-stopped
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: crimelens-postgres-exporter
+    environment:
+      DATA_SOURCE_NAME: "postgresql://${POSTGRES_USER:-${DB_USER:-crimelens_user}}:${POSTGRES_PASSWORD:-${DB_PASSWORD:-crimelens_pass}}@postgres:5432/${POSTGRES_DB:-${DB_NAME:-crimelens_db}}?sslmode=disable"
+    ports:
+      - "9187:9187"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - crimelens-net
+    restart: unless-stopped
+
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: crimelens-redis-exporter
+    environment:
+      REDIS_ADDR: redis:6379
+    ports:
+      - "9121:9121"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - crimelens-net
+    restart: unless-stopped
+
+  # ── Monitoring ────────────────────────────────────────────────
+
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    container_name: crimelens-prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=15d'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infra/prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - crimelens-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  grafana:
+    image: grafana/grafana:10.4.3
+    container_name: crimelens-grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=crimelens_admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_HTTP_PORT=3001
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infra/grafana/grafana.ini:/etc/grafana/grafana.ini:ro
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - "3001:3001"
+    depends_on:
+      - prometheus
+    networks:
+      - crimelens-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3001/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: crimelens-alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/config.yml'
+      - '--storage.path=/alertmanager'
+    volumes:
+      - ./infra/alertmanager/config.yml:/etc/alertmanager/config.yml:ro
+    ports:
+      - "9093:9093"
+    networks:
+      - crimelens-net
+    restart: unless-stopped

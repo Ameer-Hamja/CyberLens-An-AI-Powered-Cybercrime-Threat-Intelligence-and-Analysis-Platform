@@ -1,0 +1,174 @@
+name: Frontend CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend.yml'
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '20'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frontend-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  lint:
+    name: Lint Frontend
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci --silent
+
+      - name: Run ESLint
+        working-directory: frontend
+        run: |
+          npx eslint src/ \
+            --ext .jsx,.js \
+            --format stylish \
+            --max-warnings 20
+        continue-on-error: true
+
+  build:
+    name: Build React App
+    runs-on: ubuntu-latest
+    needs: lint
+    if: always() && needs.lint.result != 'cancelled'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci --silent
+
+      - name: Build production bundle
+        working-directory: frontend
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          VITE_WS_URL: ${{ secrets.VITE_WS_URL }}
+          NODE_ENV: production
+        run: npm run build 2>&1
+
+      - name: Bundle size report
+        working-directory: frontend
+        run: |
+          echo "=== Bundle Size ==="
+          du -sh dist/
+          echo "=== JS Chunks ==="
+          find dist/assets -name "*.js" -exec du -sh {} \; | sort -rh | head -10
+          echo "=== CSS Files ==="
+          find dist/assets -name "*.css" -exec du -sh {} \; | sort -rh
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist/
+          retention-days: 3
+
+  deploy:
+    name: Deploy to Vercel
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: build
+    if: vars.DEPLOY_ENABLED == 'true' && github.ref == 'refs/heads/main'
+    env:
+      DEPLOYMENT_URL: ${{ secrets.PROD_FRONTEND_URL }}
+    environment:
+      name: production-frontend
+      url: ${{ env.DEPLOYMENT_URL }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest --silent
+
+      - name: Pull Vercel environment
+        working-directory: frontend
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          vercel pull \
+            --yes \
+            --environment=production \
+            --token="$VERCEL_TOKEN"
+
+      - name: Build with Vercel
+        working-directory: frontend
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          VITE_WS_URL: ${{ secrets.VITE_WS_URL }}
+        run: |
+          vercel build \
+            --prod \
+            --token="$VERCEL_TOKEN"
+
+      - name: Deploy to Vercel production
+        working-directory: frontend
+        id: deploy
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          DEPLOY_URL=$(vercel deploy \
+            --prebuilt \
+            --prod \
+            --token="$VERCEL_TOKEN")
+          echo "deploy-url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
+          echo "Deployed to: $DEPLOY_URL"
+
+      - name: Verify deployment
+        run: |
+          echo "Verifying frontend..."
+          sleep 10
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            "${{ secrets.PROD_FRONTEND_URL }}")
+          if [ "$HTTP_STATUS" != "200" ]; then
+            echo "Frontend returned HTTP $HTTP_STATUS"
+            exit 1
+          fi
+          echo "Frontend is live: ${{ secrets.PROD_FRONTEND_URL }}"

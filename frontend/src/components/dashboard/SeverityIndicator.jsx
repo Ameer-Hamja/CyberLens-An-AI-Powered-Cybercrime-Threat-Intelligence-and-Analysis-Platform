@@ -1,0 +1,2 @@
+import clsx from 'clsx'; import { getSeverityColor } from '../../utils/threatColors'
+export default function SeverityIndicator({severity=1,showLabel=false}){const c=getSeverityColor(severity);return <div className="flex items-center gap-1.5"><div className="flex gap-0.5">{[1,2,3,4,5].map(level=><span key={level} className={clsx('w-1 rounded-full',level<=severity?c.text.replace('text-','bg-'):'bg-slate-700',severity>=4?'h-4':severity>=3?'h-3':'h-2')}/>)}</div>{showLabel&&<span className={clsx('text-xs font-medium',c.text)}>{c.label}</span>}</div>}

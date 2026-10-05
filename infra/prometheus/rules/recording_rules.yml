@@ -1,0 +1,46 @@
+groups:
+  - name: crimelens.recording
+    interval: 60s
+    rules:
+      - record: crimelens:ingestion:rate5m
+        expr: |
+          sum(rate(ingestion_events_published_total[5m]))
+
+      - record: crimelens:ingestion:rate5m:by_source
+        expr: |
+          sum by (source) (
+            rate(ingestion_events_published_total[5m])
+          )
+
+      - record: crimelens:dedup:pass_rate5m
+        expr: |
+          rate(dedup_events_new_total[5m])
+          /
+          rate(dedup_events_seen_total[5m])
+
+      - record: crimelens:api:request_rate5m
+        expr: |
+          sum by (uri, method, status) (
+            rate(http_server_requests_seconds_count{job="crimelens-backend"}[5m])
+          )
+
+      - record: crimelens:api:latency_p95
+        expr: |
+          histogram_quantile(0.95,
+            sum by (uri, le) (
+              rate(http_server_requests_seconds_bucket{
+                job="crimelens-backend",
+                uri!~"/actuator.*"
+              }[5m])
+            )
+          )
+
+      - record: crimelens:scan:dangerous_rate5m
+        expr: |
+          sum(rate(scan_requests_total{dangerous="true"}[5m]))
+          /
+          sum(rate(scan_requests_total[5m]))
+
+      - record: crimelens:pipeline:throughput1m
+        expr: |
+          rate(pipeline_threats_persisted_total[1m]) * 60

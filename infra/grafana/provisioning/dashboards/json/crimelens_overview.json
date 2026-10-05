@@ -1,0 +1,423 @@
+{
+  "__inputs": [],
+  "__requires": [
+    { "type": "grafana", "id": "grafana", "name": "Grafana", "version": "10.0.0" },
+    { "type": "datasource", "id": "prometheus", "name": "Prometheus", "version": "1.0.0" }
+  ],
+  "uid": "crimelens-overview",
+  "title": "CrimeLens Overview",
+  "tags": ["crimelens", "production"],
+  "timezone": "Asia/Kolkata",
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "version": 1,
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Pipeline Health",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 },
+      "panels": []
+    },
+    {
+      "id": 2,
+      "title": "Ingestion Rate",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 1, "w": 4, "h": 4 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(ingestion_events_published_total[5m])) * 60",
+          "legendFormat": "events/min"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "green", "value": 5 }
+            ]
+          },
+          "color": { "mode": "thresholds" }
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "none", "textMode": "auto" }
+    },
+    {
+      "id": 3,
+      "title": "Dedup Pass Rate",
+      "type": "gauge",
+      "gridPos": { "x": 4, "y": 1, "w": 4, "h": 4 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "crimelens:dedup:pass_rate5m * 100",
+          "legendFormat": "pass rate %"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 20 },
+              { "color": "green", "value": 50 }
+            ]
+          }
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "id": 4,
+      "title": "Total Threats",
+      "type": "stat",
+      "gridPos": { "x": 8, "y": 1, "w": 4, "h": 4 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "pipeline_threats_total",
+          "legendFormat": "threats"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "value" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "blue", "value": null }]
+          }
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "none" }
+    },
+    {
+      "id": 5,
+      "title": "Pipeline Throughput",
+      "type": "stat",
+      "gridPos": { "x": 12, "y": 1, "w": 4, "h": 4 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "crimelens:pipeline:throughput1m",
+          "legendFormat": "threats/min"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "blue", "value": null }
+            ]
+          }
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "area" }
+    },
+    {
+      "id": 6,
+      "title": "Kafka Consumer Lag",
+      "type": "stat",
+      "gridPos": { "x": 16, "y": 1, "w": 4, "h": 4 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "kafka_consumer_group_lag{topic=\"classified-threats\"}",
+          "legendFormat": "lag"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 100 },
+              { "color": "red", "value": 500 }
+            ]
+          },
+          "color": { "mode": "thresholds" }
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" }
+    },
+    {
+      "id": 7,
+      "title": "AI Service Status",
+      "type": "stat",
+      "gridPos": { "x": 20, "y": 1, "w": 4, "h": 4 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "up{job=\"crimelens-ai-service\"}",
+          "legendFormat": "status"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "DOWN", "color": "red" }, "1": { "text": "UP", "color": "green" } } }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          },
+          "color": { "mode": "thresholds" }
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" }
+    },
+    {
+      "id": 8,
+      "title": "Ingestion Breakdown",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": { "x": 0, "y": 5, "w": 24, "h": 1 },
+      "panels": []
+    },
+    {
+      "id": 9,
+      "title": "Events by Source",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 6, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (source) (rate(ingestion_events_published_total[5m])) * 60",
+          "legendFormat": "{{source}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "lineWidth": 2, "fillOpacity": 10 }
+        }
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
+    },
+    {
+      "id": 10,
+      "title": "Dedup Events Breakdown",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 6, "w": 12, "h": 8 },
+      "targets": [
+        { "refId": "A", "expr": "rate(dedup_events_new_total[5m]) * 60", "legendFormat": "New Events" },
+        { "refId": "B", "expr": "rate(dedup_events_duplicate_total[5m]) * 60", "legendFormat": "Duplicates Discarded" },
+        { "refId": "C", "expr": "rate(dedup_events_failOpen_total[5m]) * 60", "legendFormat": "Fail-Open Events" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "lineWidth": 2, "fillOpacity": 10 }
+        }
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
+    },
+    {
+      "id": 11,
+      "title": "API Performance",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": { "x": 0, "y": 14, "w": 24, "h": 1 },
+      "panels": []
+    },
+    {
+      "id": 12,
+      "title": "API Request Rate",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 15, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (uri, status) (rate(http_server_requests_seconds_count{job=\"crimelens-backend\",uri!~\"/actuator.*\"}[1m]))",
+          "legendFormat": "{{uri}} [{{status}}]"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "lineWidth": 1, "fillOpacity": 5 } } },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull"] } }
+    },
+    {
+      "id": 13,
+      "title": "API Latency p50/p95/p99",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 15, "w": 12, "h": 8 },
+      "targets": [
+        { "refId": "A", "expr": "histogram_quantile(0.50, sum by (le) (rate(http_server_requests_seconds_bucket{job=\"crimelens-backend\",uri!~\"/actuator.*\"}[5m])))", "legendFormat": "p50" },
+        { "refId": "B", "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{job=\"crimelens-backend\",uri!~\"/actuator.*\"}[5m])))", "legendFormat": "p95" },
+        { "refId": "C", "expr": "histogram_quantile(0.99, sum by (le) (rate(http_server_requests_seconds_bucket{job=\"crimelens-backend\",uri!~\"/actuator.*\"}[5m])))", "legendFormat": "p99" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s", "custom": { "lineWidth": 2, "fillOpacity": 5 } } },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
+    },
+    {
+      "id": 14,
+      "title": "Citizen Scanner",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": { "x": 0, "y": 23, "w": 24, "h": 1 },
+      "panels": []
+    },
+    {
+      "id": 15,
+      "title": "Scan Request Rate",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 24, "w": 8, "h": 7 },
+      "targets": [
+        { "refId": "A", "expr": "sum by (type) (rate(scan_requests_total[5m])) * 60", "legendFormat": "{{type}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "lineWidth": 2, "fillOpacity": 10 } } }
+    },
+    {
+      "id": 16,
+      "title": "Dangerous Scan Rate",
+      "type": "gauge",
+      "gridPos": { "x": 8, "y": 24, "w": 4, "h": 7 },
+      "targets": [
+        { "refId": "A", "expr": "crimelens:scan:dangerous_rate5m * 100", "legendFormat": "% dangerous" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 30 },
+              { "color": "red", "value": 60 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 17,
+      "title": "WebSocket Broadcasts",
+      "type": "stat",
+      "gridPos": { "x": 12, "y": 24, "w": 4, "h": 7 },
+      "targets": [
+        { "refId": "A", "expr": "rate(pipeline_websocket_broadcasts_total[5m]) * 60", "legendFormat": "broadcasts/min" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] }
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" }
+    },
+    {
+      "id": 18,
+      "title": "Rate Limit Hits",
+      "type": "timeseries",
+      "gridPos": { "x": 16, "y": 24, "w": 8, "h": 7 },
+      "targets": [
+        { "refId": "A", "expr": "rate(http_server_requests_seconds_count{status=\"429\",job=\"crimelens-backend\"}[5m]) * 60", "legendFormat": "429 hits/min" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "color": { "fixedColor": "orange", "mode": "fixed" } } }
+    },
+    {
+      "id": 19,
+      "title": "JVM & System",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": { "x": 0, "y": 31, "w": 24, "h": 1 },
+      "panels": []
+    },
+    {
+      "id": 20,
+      "title": "JVM Heap Usage",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 32, "w": 8, "h": 7 },
+      "targets": [
+        { "refId": "A", "expr": "jvm_memory_used_bytes{area=\"heap\"}", "legendFormat": "Used" },
+        { "refId": "B", "expr": "jvm_memory_max_bytes{area=\"heap\"}", "legendFormat": "Max" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "lineWidth": 2, "fillOpacity": 10 } } }
+    },
+    {
+      "id": 21,
+      "title": "JVM GC Pause Rate",
+      "type": "timeseries",
+      "gridPos": { "x": 8, "y": 32, "w": 8, "h": 7 },
+      "targets": [
+        { "refId": "A", "expr": "rate(jvm_gc_pause_seconds_sum[5m])", "legendFormat": "GC pause rate" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s", "custom": { "lineWidth": 2 } } }
+    },
+    {
+      "id": 22,
+      "title": "Active Threads",
+      "type": "timeseries",
+      "gridPos": { "x": 16, "y": 32, "w": 8, "h": 7 },
+      "targets": [
+        { "refId": "A", "expr": "jvm_threads_live_threads{job=\"crimelens-backend\"}", "legendFormat": "live threads" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "lineWidth": 2 } } }
+    },
+    {
+      "id": 23,
+      "title": "Database & Cache",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": { "x": 0, "y": 39, "w": 24, "h": 1 },
+      "panels": []
+    },
+    {
+      "id": 24,
+      "title": "HikariCP Connection Pool",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 40, "w": 8, "h": 7 },
+      "targets": [
+        { "refId": "A", "expr": "hikaricp_connections_active", "legendFormat": "Active" },
+        { "refId": "B", "expr": "hikaricp_connections_idle", "legendFormat": "Idle" },
+        { "refId": "C", "expr": "hikaricp_connections_max", "legendFormat": "Max" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "lineWidth": 2, "fillOpacity": 5 } } }
+    },
+    {
+      "id": 25,
+      "title": "Redis Memory",
+      "type": "timeseries",
+      "gridPos": { "x": 8, "y": 40, "w": 8, "h": 7 },
+      "targets": [
+        { "refId": "A", "expr": "redis_memory_used_bytes", "legendFormat": "Used" },
+        { "refId": "B", "expr": "redis_memory_max_bytes", "legendFormat": "Max" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "lineWidth": 2, "fillOpacity": 10 } } }
+    },
+    {
+      "id": 26,
+      "title": "Cache Hit Rate",
+      "type": "timeseries",
+      "gridPos": { "x": 16, "y": 40, "w": 8, "h": 7 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(cache_gets_total{result=\"hit\"}[5m]) / rate(cache_gets_total[5m])",
+          "legendFormat": "hit rate"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 } }
+    }
+  ]
+}

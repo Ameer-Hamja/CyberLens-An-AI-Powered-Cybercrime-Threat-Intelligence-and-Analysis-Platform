@@ -1,0 +1,2 @@
+import clsx from 'clsx'
+export default function PulsingDot({color='green',size='sm'}){const colors={green:'bg-emerald-500',red:'bg-red-500',amber:'bg-amber-500',blue:'bg-blue-500'},sizes={sm:'h-2 w-2',md:'h-3 w-3'};return <span className={clsx('relative flex',sizes[size])}><span className={clsx('absolute inline-flex h-full w-full animate-ping rounded-full opacity-75',colors[color])}/><span className={clsx('relative inline-flex h-full w-full rounded-full',colors[color])}/></span>}

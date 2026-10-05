@@ -1,0 +1,88 @@
+name: Production Smoke Tests
+
+on:
+  workflow_run:
+    workflows: ["Backend CI/CD", "Frontend CI/CD", "AI Service CI/CD"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: production-smoke-tests
+  cancel-in-progress: true
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    if: >-
+      vars.DEPLOY_ENABLED == 'true' &&
+      (github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event != 'pull_request'))
+    steps:
+      - name: Wait for all deployments of this commit
+        if: github.event_name == 'workflow_run'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const source = context.payload.workflow_run;
+            const workflows = source.event === 'push'
+              ? ['backend.yml', 'ai-service.yml', 'frontend.yml']
+              : [source.workflow_id];
+            const deadline = Date.now() + 60 * 60 * 1000;
+            while (Date.now() < deadline) {
+              let ready = true;
+              for (const workflow_id of workflows) {
+                const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
+                  ...context.repo, workflow_id, head_sha: source.head_sha,
+                  branch: 'main', event: source.event, per_page: 100
+                });
+                const run = runs.sort((a, b) => b.id - a.id)[0];
+                if (!run || run.status !== 'completed') {
+                  ready = false;
+                  continue;
+                }
+                if (run.conclusion !== 'success') {
+                  throw new Error('Deployment failed: ' + run.name + ' (' + run.conclusion + ')');
+                }
+              }
+              if (ready) return;
+              await new Promise(resolve => setTimeout(resolve, 15000));
+            }
+            throw new Error('Timed out waiting for deployments of ' + source.head_sha);
+
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install smoke test dependencies
+        run: pip install httpx==0.27.0 pytest==8.2.0
+      - name: Run production smoke tests
+        env:
+          BACKEND_URL: ${{ secrets.PROD_BACKEND_URL }}
+          FRONTEND_URL: ${{ secrets.PROD_FRONTEND_URL }}
+          AI_URL: ${{ secrets.PROD_AI_SERVICE_URL }}
+          ADMIN_PASS: ${{ secrets.PROD_ADMIN_PASSWORD }}
+        run: pytest .github/scripts/smoke_test.py -v --tb=short --junitxml=test-results/smoke.xml
+      - name: Upload smoke results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-smoke-results
+          path: test-results/
+          retention-days: 7
+      - name: Write summary
+        if: always()
+        env:
+          TEST_STATUS: ${{ job.status }}
+          TEST_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          echo "## Production Smoke Tests" >> "$GITHUB_STEP_SUMMARY"
+          echo "Result: $TEST_STATUS" >> "$GITHUB_STEP_SUMMARY"
+          echo "Commit: $TEST_SHA" >> "$GITHUB_STEP_SUMMARY"
+          echo "See production-smoke-results for the JUnit report." >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,181 @@
+groups:
+  - name: crimelens.pipeline
+    interval: 30s
+    rules:
+      - alert: IngestionStopped
+        expr: |
+          rate(ingestion_events_published_total[30m]) == 0
+        for: 5m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "Ingestion pipeline has stopped"
+          description: >
+            No events have been published to Kafka in the last 30 minutes.
+            Check CERT-In RSS feed connectivity and Kafka broker health.
+
+      - alert: HighDuplicateRate
+        expr: |
+          rate(dedup_events_duplicate_total[10m])
+          /
+          rate(dedup_events_seen_total[10m]) > 0.95
+        for: 10m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "Dedup duplicate rate above 95%"
+          description: >
+            More than 95% of events are being flagged as duplicates.
+            Either the bloom filter is saturated or ingestion is
+            repeatedly fetching the same content.
+
+      - alert: ClassificationFailureSpike
+        expr: |
+          rate(pipeline_threats_failed_total[5m]) > 0.1
+        for: 3m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "High classification failure rate"
+          description: >
+            More than 0.1 failures/sec in the classification pipeline.
+            Check AI service health and Kafka consumer lag.
+
+      - alert: KafkaConsumerLagHigh
+        expr: |
+          kafka_consumer_group_lag{topic="classified-threats"} > 500
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "Kafka consumer lag > 500 on classified-threats"
+          description: >
+            The classified-threats consumer is falling behind.
+            Consider scaling the consumer or investigating slow
+            persistence operations.
+
+  - name: crimelens.api
+    interval: 15s
+    rules:
+      - alert: ApiErrorRateHigh
+        expr: |
+          rate(http_server_requests_seconds_count{status=~"5..",job="crimelens-backend"}[5m])
+          /
+          rate(http_server_requests_seconds_count{job="crimelens-backend"}[5m]) > 0.05
+        for: 3m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "API 5xx error rate above 5%"
+          description: >
+            More than 5% of API requests are returning 5xx errors.
+            Check application logs for stack traces.
+
+      - alert: ApiLatencyHigh
+        expr: |
+          histogram_quantile(0.99,
+            rate(http_server_requests_seconds_bucket{job="crimelens-backend",uri!~"/actuator.*"}[5m])
+          ) > 2.0
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "API p99 latency above 2 seconds"
+          description: >
+            99th percentile API response time has exceeded 2 seconds.
+            Check database query performance and Redis cache hit rate.
+
+      - alert: RateLimitHitFrequently
+        expr: |
+          rate(http_server_requests_seconds_count{status="429",job="crimelens-backend"}[5m]) > 1
+        for: 5m
+        labels:
+          severity: info
+          team: backend
+        annotations:
+          summary: "Rate limit (429) hit more than 1/sec"
+          description: >
+            The citizen scanner rate limiter is triggering frequently.
+            This may indicate automated scanning or a legitimate
+            traffic spike. Consider adjusting limits.
+
+  - name: crimelens.infrastructure
+    interval: 30s
+    rules:
+      - alert: JvmHeapHigh
+        expr: |
+          jvm_memory_used_bytes{area="heap"}
+          /
+          jvm_memory_max_bytes{area="heap"} > 0.85
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "JVM heap usage above 85%"
+          description: >
+            Spring Boot JVM heap is above 85%. Risk of OutOfMemoryError.
+            Consider increasing Xmx or investigating memory leaks.
+
+      - alert: AiServiceDown
+        expr: up{job="crimelens-ai-service"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "AI classification service is down"
+          description: >
+            Prometheus cannot reach the AI service /metrics endpoint.
+            The pipeline will fall back to stub classification.
+            Restart the ai-service container.
+
+      - alert: BackendDown
+        expr: up{job="crimelens-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "Spring Boot backend is unreachable"
+          description: >
+            Prometheus cannot scrape the backend. The entire platform
+            is likely down. Check the backend container immediately.
+
+      - alert: PostgresConnectionPoolHigh
+        expr: |
+          hikaricp_connections_active
+          /
+          hikaricp_connections_max > 0.80
+        for: 3m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "HikariCP connection pool above 80%"
+          description: >
+            The PostgreSQL connection pool is nearly exhausted.
+            Active connections are above 80% of maximum. Check for
+            long-running queries or connection leaks.
+
+      - alert: RedisMemoryHigh
+        expr: |
+          redis_memory_used_bytes
+          /
+          redis_memory_max_bytes > 0.80
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "Redis memory usage above 80%"
+          description: >
+            Redis is using more than 80% of its configured maxmemory.
+            The bloom filter or cache may need to be cleared or
+            Redis maxmemory should be increased.

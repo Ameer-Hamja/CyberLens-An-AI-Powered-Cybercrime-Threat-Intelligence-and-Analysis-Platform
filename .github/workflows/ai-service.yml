@@ -1,0 +1,207 @@
+name: AI Service CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'ai-service/**'
+      - '.github/workflows/ai-service.yml'
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: '3.11'
+  HF_SPACE: ${{ secrets.HF_SPACE_NAME }}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-service-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Run Python Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: ai-service/requirements.txt
+
+      - name: Install system dependencies (OCR)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y \
+            tesseract-ocr \
+            tesseract-ocr-hin \
+            tesseract-ocr-tam \
+            libgl1 \
+            libglib2.0-0 \
+            --no-install-recommends
+
+      - name: Install Python dependencies
+        working-directory: ai-service
+        run: |
+          pip install --upgrade pip --quiet
+          pip install -r requirements.txt --quiet
+          pip install pytest-timeout==2.3.1 --quiet
+
+      - name: Run core tests
+        working-directory: ai-service
+        env:
+          MODEL_NAME: xlm-roberta-base
+          CONFIDENCE_THRESHOLD: '0.60'
+          ENVIRONMENT: test
+          LOG_LEVEL: WARNING
+        run: |
+          pytest tests/ \
+            -v \
+            --tb=short \
+            --no-header \
+            -q \
+            --timeout=120 \
+            -k "not test_full_model" \
+            --junitxml=test-results/pytest.xml
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pytest-results
+          path: ai-service/test-results/
+          retention-days: 7
+
+  lint:
+    name: Lint Python Code
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install ruff
+        run: pip install ruff==0.4.7 --quiet
+
+      - name: Run ruff
+        working-directory: ai-service
+        run: |
+          ruff check app/ \
+            --select E,W,F \
+            --ignore E501 \
+            --output-format=github
+        continue-on-error: true
+
+  deploy:
+    name: Deploy to Hugging Face Spaces
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [test, lint]
+    if: |
+      vars.DEPLOY_ENABLED == 'true' &&
+      github.ref == 'refs/heads/main' &&
+      needs.test.result == 'success'
+    environment:
+      name: production-ai
+      url: https://huggingface.co/spaces/${{ env.HF_SPACE }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install huggingface-hub CLI
+        run: pip install huggingface-hub==0.23.4 --quiet
+
+      - name: Configure Git
+        run: |
+          git config --global user.email "ci@crimelens.in"
+          git config --global user.name "CrimeLens CI"
+
+      - name: Create HF Space README if missing
+        working-directory: ai-service
+        run: |
+          if [ ! -f README.md ]; then
+            cat > README.md << 'RMEOF'
+          ---
+          title: CrimeLens AI Service
+          emoji: 🔍
+          colorFrom: blue
+          colorTo: red
+          sdk: docker
+          pinned: false
+          license: mit
+          app_port: 8000
+          ---
+          # CrimeLens AI Classification Service
+          Multilingual cybercrime threat classifier for Indian digital users.
+          RMEOF
+          fi
+
+      - name: Push to Hugging Face Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE: ${{ secrets.HF_SPACE_NAME }}
+        run: |
+          python3 - << 'PYEOF'
+          from huggingface_hub import HfApi
+          import os
+          api = HfApi(token=os.environ["HF_TOKEN"])
+          space_name = os.environ["HF_SPACE"]
+          short_sha = "${{ github.sha }}"[:8]
+          api.upload_folder(
+              folder_path="ai-service",
+              repo_id=space_name,
+              repo_type="space",
+              commit_message=f"Deploy: {short_sha}",
+              ignore_patterns=[
+                  "**/__pycache__/**", "*.pyc", ".pytest_cache/**",
+                  "**/model_cache/**", ".env*", "tests/**",
+                  ".venv/**", "venv/**", "test-results/**",
+              ]
+          )
+          print(f"Deployed to https://huggingface.co/spaces/{space_name}")
+          PYEOF
+
+      - name: Wait for Space to build
+        env:
+          HF_SPACE: ${{ secrets.HF_SPACE_NAME }}
+        run: |
+          echo "Waiting for HF Space to build (up to 5 minutes)..."
+          sleep 30
+          MAX_ATTEMPTS=18
+          ATTEMPT=0
+          SPACE_SLUG=$(echo "$HF_SPACE" | tr '/' '-')
+          HEALTH_URL="https://${SPACE_SLUG}.hf.space/health"
+          until curl --fail --silent --show-error --max-time 15 "$HEALTH_URL" | jq -e '.status == "ok"' > /dev/null; do
+            ATTEMPT=$((ATTEMPT + 1))
+            if [ $ATTEMPT -ge $MAX_ATTEMPTS ]; then
+              echo "Space build timed out — check HF build logs"
+              echo "URL: https://huggingface.co/spaces/$HF_SPACE"
+              exit 1
+            fi
+            echo "Attempt $ATTEMPT/$MAX_ATTEMPTS — waiting 15s..."
+            sleep 15
+          done
+          echo "AI Service is healthy"

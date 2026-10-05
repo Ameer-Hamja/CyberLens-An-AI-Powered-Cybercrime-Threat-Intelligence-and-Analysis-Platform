@@ -1,0 +1,303 @@
+name: Backend CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend.yml'
+  workflow_dispatch:
+    inputs:
+      skip_tests:
+        description: 'Skip tests (emergency deploy only)'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  JAVA_VERSION: '25'
+  IMAGE_NAME: ${{ secrets.DOCKER_USERNAME }}/crimelens-backend
+  REGISTRY: docker.io
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: ${{ github.event.inputs.skip_tests != 'true' }}
+
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_DB: crimelens_test
+          POSTGRES_USER: crimelens
+          POSTGRES_PASSWORD: crimelens_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis/redis-stack:latest
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: maven
+
+      - name: Cache Maven packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('backend/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+
+      - name: Run unit tests
+        working-directory: backend
+        env:
+          SPRING_PROFILES_ACTIVE: test
+          DB_URL: jdbc:postgresql://localhost:5432/crimelens_test
+          DB_USERNAME: crimelens
+          DB_PASSWORD: crimelens_test
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          KAFKA_BOOTSTRAP_SERVERS: localhost:9092
+          AI_SERVICE_URL: http://localhost:8000
+          ELASTICSEARCH_URIS: http://localhost:9200
+          JWT_SECRET: test_secret_key_minimum_32_characters_long
+          TWITTER_INGESTION_ENABLED: false
+          SPRING_FLYWAY_ENABLED: false
+          SPRING_JPA_HIBERNATE_DDL_AUTO: create-drop
+        run: |
+          mvn test \
+            -Dtest="*Test,!*IntegrationTest" \
+            -DfailIfNoTests=false \
+            --no-transfer-progress
+
+      - name: Run integration tests
+        working-directory: backend
+        env:
+          SPRING_PROFILES_ACTIVE: test
+          DB_URL: jdbc:postgresql://localhost:5432/crimelens_test
+          DB_USERNAME: crimelens
+          DB_PASSWORD: crimelens_test
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          KAFKA_BOOTSTRAP_SERVERS: localhost:9092
+          AI_SERVICE_URL: http://localhost:8000
+          ELASTICSEARCH_URIS: http://localhost:9200
+          JWT_SECRET: test_secret_key_minimum_32_characters_long
+          TWITTER_INGESTION_ENABLED: false
+          SPRING_FLYWAY_ENABLED: false
+          SPRING_JPA_HIBERNATE_DDL_AUTO: create-drop
+        run: |
+          mvn test \
+            -Dtest="*IntegrationTest" \
+            -DfailIfNoTests=false \
+            --no-transfer-progress
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: backend/target/surefire-reports/
+          retention-days: 7
+
+  build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: test
+    if: |
+      always() &&
+      vars.DEPLOY_ENABLED == 'true' &&
+      (needs.test.result == 'success' ||
+       needs.test.result == 'skipped') &&
+      github.ref == 'refs/heads/main' &&
+      github.event_name != 'pull_request'
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: maven
+
+      - name: Build JAR (skip tests — already ran)
+        working-directory: backend
+        run: |
+          mvn clean package \
+            -DskipTests \
+            --no-transfer-progress
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix=sha-
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value={{date 'YYYY-MM-DD'}}-{{sha}}
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+
+      - name: Output image digest
+        run: |
+          echo "Image digest: ${{ steps.build.outputs.digest }}"
+          echo "Image tags:   ${{ steps.meta.outputs.tags }}"
+
+  deploy:
+    name: Deploy to Railway
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: build
+    if: vars.DEPLOY_ENABLED == 'true' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    env:
+      DEPLOYMENT_URL: ${{ secrets.PROD_BACKEND_URL }}
+    environment:
+      name: production
+      url: ${{ env.DEPLOYMENT_URL }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm install --global @railway/cli@4
+
+      - name: Link Railway project
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+          SERVICE_ID: ${{ secrets.RAILWAY_BACKEND_SERVICE }}
+        run: |
+          railway link --project "$PROJECT_ID" --service "$SERVICE_ID" --environment production
+
+      - name: Set Railway environment variables
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          SERVICE_ID: ${{ secrets.RAILWAY_BACKEND_SERVICE }}
+          DB_URL: ${{ secrets.DB_URL }}
+          DB_USERNAME: ${{ secrets.DB_USERNAME }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          REDIS_HOST: ${{ secrets.REDIS_HOST }}
+          REDIS_PORT: ${{ secrets.REDIS_PORT }}
+          KAFKA_BOOTSTRAP_SERVERS: ${{ secrets.KAFKA_BOOTSTRAP_SERVERS }}
+          AI_SERVICE_URL: ${{ secrets.AI_SERVICE_URL }}
+          ELASTICSEARCH_URIS: ${{ secrets.ELASTICSEARCH_URI }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          TWITTER_BEARER_TOKEN: ${{ secrets.TWITTER_BEARER_TOKEN }}
+          FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
+          ADMIN_PASSWORD: ${{ secrets.PROD_ADMIN_PASSWORD }}
+        run: |
+          railway variables set \
+            DB_URL="$DB_URL" \
+            DB_USERNAME="$DB_USERNAME" \
+            DB_PASSWORD="$DB_PASSWORD" \
+            REDIS_HOST="$REDIS_HOST" \
+            REDIS_PORT="$REDIS_PORT" \
+            KAFKA_BOOTSTRAP_SERVERS="$KAFKA_BOOTSTRAP_SERVERS" \
+            AI_SERVICE_URL="$AI_SERVICE_URL" \
+            ELASTICSEARCH_URIS="$ELASTICSEARCH_URIS" \
+            JWT_SECRET="$JWT_SECRET" \
+            TWITTER_INGESTION_ENABLED="true" \
+            TWITTER_BEARER_TOKEN="$TWITTER_BEARER_TOKEN" \
+            FRONTEND_URL="$FRONTEND_URL" \
+            ADMIN_PASSWORD="$ADMIN_PASSWORD" \
+            ENVIRONMENT="production" \
+            --skip-deploys --service "$SERVICE_ID"
+
+      - name: Deploy backend and wait for Railway
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          SERVICE_ID: ${{ secrets.RAILWAY_BACKEND_SERVICE }}
+        run: railway up backend --path-as-root --service "$SERVICE_ID" --environment production --ci
+
+      - name: Wait for deployment health check
+        env:
+          BACKEND_URL: ${{ secrets.PROD_BACKEND_URL }}
+        run: |
+          echo "Waiting for backend to become healthy..."
+          MAX_ATTEMPTS=20
+          ATTEMPT=0
+          until curl --fail --silent --show-error --max-time 15 "$BACKEND_URL/actuator/health" \
+              | jq -e '.status == "UP"' > /dev/null; do
+            ATTEMPT=$((ATTEMPT + 1))
+            if [ $ATTEMPT -ge $MAX_ATTEMPTS ]; then
+              echo "Backend did not become healthy in time"
+              exit 1
+            fi
+            echo "Attempt $ATTEMPT/$MAX_ATTEMPTS — waiting 15s..."
+            sleep 15
+          done
+          echo "Backend is healthy"
+
+      - name: Notify result
+        if: always()
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "Backend deployed successfully"
+            echo "URL: ${{ secrets.PROD_BACKEND_URL }}"
+            echo "Commit: ${{ github.sha }}"
+          else
+            echo "Backend deployment FAILED"
+            echo "Commit: ${{ github.sha }}"
+            exit 1
+          fi

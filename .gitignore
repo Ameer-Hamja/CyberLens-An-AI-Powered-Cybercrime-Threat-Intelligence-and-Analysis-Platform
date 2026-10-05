@@ -1,0 +1,68 @@
+# ── Java / Maven ─────────────────────────────────────────────────
+backend/target/
+backend/*.class
+
+# ── Python ───────────────────────────────────────────────────────
+ai-service/__pycache__/
+ai-service/**/__pycache__/
+ai-service/*.pyc
+ai-service/*.pyo
+ai-service/.pytest_cache/
+ai-service/model_cache/
+ai-service/.env
+ai-service/venv/
+ai-service/.venv/
+
+# ── Node / React ─────────────────────────────────────────────────
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.local
+frontend/.env.production
+frontend/.vercel/
+
+# ── Environment files (NEVER commit these) ───────────────────────
+.env
+.env.local
+.env.production
+.env.*.local
+
+# ── IDE ──────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.iml
+*.iws
+.DS_Store
+Thumbs.db
+
+# ── Docker ───────────────────────────────────────────────────────
+docker-compose.override.yml
+
+# ── Logs ─────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── Monitoring data (local volumes only) ─────────────────────────
+infra/prometheus/data/
+infra/grafana/data/
+
+# ── Model cache (too large for git) ──────────────────────────────
+**/model_cache/
+*.bin
+*.safetensors
+*.onnx
+
+**/__pycache__/
+**/*.pyc
+**/test-results/
+.venv/
+.vercel/
+
+# Local credentials and generated assistant state
+.env*
+!.env.example
+!**/.env.example
+**/.github/modernize/
+**/.kiro/
+*.pem
+*.key
