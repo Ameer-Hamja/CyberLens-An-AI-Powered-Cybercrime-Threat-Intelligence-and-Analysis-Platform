@@ -40,9 +40,10 @@ spring:
             enable: true
 
 app:
+  trusted-proxies: ${TRUSTED_PROXIES:}
   jwt:
     secret: ${JWT_SECRET:your_jwt_secret_key_change_me_in_production}
-    expiration-ms: 86400000
+    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
   ai-service:
     url: ${AI_SERVICE_URL:http://localhost:8000}
 
@@ -50,7 +51,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,prometheus,metrics,env,loggers
+        include: health,info,prometheus,metrics
       base-path: /actuator
   endpoint:
     health:

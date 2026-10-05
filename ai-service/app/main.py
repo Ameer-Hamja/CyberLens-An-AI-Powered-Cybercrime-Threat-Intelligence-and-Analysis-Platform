@@ -4,7 +4,6 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 import structlog
-import time
 from prometheus_fastapi_instrumentator import Instrumentator
 
 from app.config import get_settings
@@ -17,8 +16,14 @@ settings = get_settings()
 
 pipeline_instance = None
 
+
 def get_pipeline() -> ClassifierPipeline:
+    if pipeline_instance is None:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=503, detail="Analysis service is starting")
     return pipeline_instance
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -29,11 +34,12 @@ async def lifespan(app: FastAPI):
     yield
     logger.info("AI service shutting down")
 
+
 app = FastAPI(
     title="CrimeLens AI Service",
     description="Multilingual cybercrime threat classification for Indian digital users",
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -49,17 +55,24 @@ app.include_router(scan.router)
 
 Instrumentator().instrument(app).expose(app)
 
+
 @app.get("/health")
 def health_check():
     return {
         "status": "ok",
-        "model_loaded": pipeline_instance.transformer.loaded if pipeline_instance else False,
-        "environment": settings.environment
+        "model_loaded": pipeline_instance.transformer.loaded
+        if pipeline_instance
+        else False,
+        "environment": settings.environment,
     }
+
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     return JSONResponse(
         status_code=422,
-        content=ApiResponse(success=False, error=str(exc)).model_dump()
+        content=ApiResponse(
+            success=False,
+            error="Invalid input: check required fields and length limits",
+        ).model_dump(),
     )

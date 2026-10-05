@@ -9,7 +9,7 @@ const VERDICT_CONFIG = {
   SCAM_SCREENSHOT: { label: 'Scam Screenshot', color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/30', topBorder: 'border-t-red-500', icon: '🚨' },
   FAKE_DOCUMENT: { label: 'Fake Document', color: 'text-orange-400', bg: 'bg-orange-500/10', border: 'border-orange-500/30', topBorder: 'border-t-orange-500', icon: '📄' },
   SUSPICIOUS: { label: 'Suspicious', color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/30', topBorder: 'border-t-amber-500', icon: '⚠️' },
-  LIKELY_LEGITIMATE: { label: 'Likely Legitimate', color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', topBorder: 'border-t-emerald-500', icon: '✅' },
+  LIKELY_LEGITIMATE: { label: 'No Strong Signals', color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', topBorder: 'border-t-emerald-500', icon: '✅' },
 }
 
 function SignalRow({ signal }) {
@@ -62,7 +62,7 @@ export default function ImageScanResult({ result, onReset }) {
         <span className="text-lg">{config.icon}</span>
         <div>
           <p className={clsx('text-sm font-medium', config.color)}>{config.label}</p>
-          <p className="text-xs text-slate-500">{Math.round(confidence * 100)}% confidence</p>
+          <p className="text-xs text-slate-500">{Math.round(confidence * 100)}% heuristic score · not a probability of authenticity</p>
         </div>
       </div>
       <div className="p-4 space-y-5">

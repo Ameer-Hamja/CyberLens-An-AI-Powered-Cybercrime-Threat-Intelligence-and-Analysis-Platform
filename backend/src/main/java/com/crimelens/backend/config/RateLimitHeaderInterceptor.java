@@ -13,6 +13,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
 public class RateLimitHeaderInterceptor implements HandlerInterceptor {
 
     private final RateLimiterService rateLimiterService;
+    private final ClientIpResolver clientIpResolver;
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
@@ -28,10 +29,6 @@ public class RateLimitHeaderInterceptor implements HandlerInterceptor {
     }
 
     private String getClientIP(HttpServletRequest request) {
-        String xfHeader = request.getHeader("X-Forwarded-For");
-        if (xfHeader == null) {
-            return request.getRemoteAddr();
-        }
-        return xfHeader.split(",")[0];
+        return clientIpResolver.resolve(request);
     }
 }

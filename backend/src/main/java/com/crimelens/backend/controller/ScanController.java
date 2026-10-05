@@ -80,8 +80,10 @@ public class ScanController {
 
     private final ScanLogService scanLogService;
     private final RateLimiterService rateLimiterService;
+    private final com.crimelens.backend.config.ClientIpResolver clientIpResolver;
     private final ScanLogRepository scanLogRepository;
     private final MeterRegistry meterRegistry;
+    private final org.springframework.web.client.RestTemplate restTemplate;
 
     @Operation(summary = "Scan suspicious text, URL, SMS, or UPI ID")
     @PostMapping
@@ -131,7 +133,7 @@ public class ScanController {
         }
 
         Set<String> allowed = Set.of("image/jpeg", "image/png", "image/webp", "image/gif", "image/bmp");
-        if (!allowed.contains(file.getContentType())) {
+        if (file.getContentType() == null || !allowed.contains(file.getContentType())) {
             throw new ResponseStatusException(HttpStatus.UNSUPPORTED_MEDIA_TYPE,
                     "Unsupported file type: " + file.getContentType());
         }
@@ -146,12 +148,14 @@ public class ScanController {
             headers.setContentType(org.springframework.http.MediaType.MULTIPART_FORM_DATA);
 
             org.springframework.util.MultiValueMap<String, Object> body = new org.springframework.util.LinkedMultiValueMap<>();
-            body.add("file", new MultipartInputStreamFileResource(file.getInputStream(), file.getOriginalFilename()));
+            org.springframework.http.HttpHeaders partHeaders = new org.springframework.http.HttpHeaders();
+            partHeaders.setContentType(MediaType.parseMediaType(file.getContentType()));
+            body.add("file", new org.springframework.http.HttpEntity<>(new MultipartInputStreamFileResource(file.getInputStream(), file.getOriginalFilename()), partHeaders));
 
             org.springframework.http.HttpEntity<org.springframework.util.MultiValueMap<String, Object>> requestEntity =
                     new org.springframework.http.HttpEntity<>(body, headers);
 
-            org.springframework.web.client.RestTemplate restTemplate = new org.springframework.web.client.RestTemplate();
+            // Use the shared HTTP client with bounded connection/read timeouts.
 
             ResponseEntity<String> response = restTemplate.exchange(
                     scanLogService.getAiServiceUrl() + "/scan/image",
@@ -169,11 +173,13 @@ public class ScanController {
             }
             return ResponseEntity.ok(ApiResponse.success(respMap));
 
+        } catch (org.springframework.web.client.HttpClientErrorException e) {
+            return ResponseEntity.status(e.getStatusCode()).body(ApiResponse.error("Image could not be analyzed: invalid or unsupported image"));
         } catch (org.springframework.web.client.ResourceAccessException e) {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(ApiResponse.error("Image analysis service temporarily unavailable"));
         } catch (Exception e) {
             log.error("Image scan proxy error", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error("Internal server error: " + e.getMessage()));
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error("Image analysis failed"));
         }
     }
 
@@ -193,19 +199,7 @@ public class ScanController {
     }
 
     private String extractClientIp(HttpServletRequest request) {
-        String[] headers = {
-                "X-Forwarded-For",
-                "X-Real-IP",
-                "Proxy-Client-IP",
-                "WL-Proxy-Client-IP"
-        };
-        for (String header : headers) {
-            String val = request.getHeader(header);
-            if (val != null && !val.isEmpty() && !"unknown".equalsIgnoreCase(val)) {
-                return val.split(",")[0].trim();
-            }
-        }
-        String ip = request.getRemoteAddr();
+        String ip = clientIpResolver.resolve(request);
         return ip != null ? ip : "unknown";
     }
 }

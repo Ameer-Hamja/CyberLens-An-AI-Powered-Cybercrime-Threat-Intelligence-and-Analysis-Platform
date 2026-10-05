@@ -24,6 +24,9 @@
 networks:
   crimelens-net:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
 
 volumes:
   postgres_data:
@@ -151,9 +154,11 @@ services:
     build:
       context: ./ai-service
       dockerfile: Dockerfile
+      args:
+        INSTALL_MODELS: ${INSTALL_MODELS:-false}
     container_name: crimelens-ai-service
     environment:
-      - MODEL_NAME=${MODEL_NAME:-xlm-roberta-base}
+      - MODEL_NAME=${MODEL_NAME:-}
       - MODEL_CACHE_DIR=/app/model_cache
       - CONFIDENCE_THRESHOLD=${CONFIDENCE_THRESHOLD:-0.60}
       - ENVIRONMENT=production
@@ -198,11 +203,12 @@ services:
       - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
       - ELASTICSEARCH_URIS=http://elasticsearch:9200
       - AI_SERVICE_URL=http://ai-service:8000
-      - JWT_SECRET=${JWT_SECRET:-changeme_in_production_min32chars}
+      - JWT_SECRET=${JWT_SECRET:-local_dev_only_change_this_secret_32chars_minimum}
       - TWITTER_INGESTION_ENABLED=${TWITTER_ENABLED:-false}
       - TWITTER_BEARER_TOKEN=${TWITTER_BEARER_TOKEN:-}
       - CERT_IN_FEED_URL=${CERT_IN_FEED_URL:-https://www.cert-in.org.in/RSS.jsp}
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
+      - TRUSTED_PROXIES=172.30.0.10
       - JAVA_OPTS=-Xms256m -Xmx512m
       - SPRING_FLYWAY_BASELINE_ON_MIGRATE=true
       - SPRING_FLYWAY_BASELINE_VERSION=0
@@ -238,7 +244,8 @@ services:
     depends_on:
       - backend
     networks:
-      - crimelens-net
+      crimelens-net:
+        ipv4_address: 172.30.0.10
 
   # ── Exporters ─────────────────────────────────────────────────
 
@@ -318,7 +325,7 @@ services:
     container_name: crimelens-grafana
     environment:
       - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=crimelens_admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-crimelens_admin}
       - GF_USERS_ALLOW_SIGN_UP=false
       - GF_SERVER_HTTP_PORT=3001
       - GF_INSTALL_PLUGINS=grafana-piechart-panel

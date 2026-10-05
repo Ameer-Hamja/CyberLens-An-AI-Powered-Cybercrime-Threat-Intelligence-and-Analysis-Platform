@@ -18,10 +18,10 @@ public interface ScanLogRepository extends JpaRepository<ScanLog, UUID> {
     
     @Query("SELECT s.threatType FROM ScanLog s GROUP BY s.threatType " +
            "ORDER BY COUNT(s) DESC")
-    List<String> findTopThreatTypes(Pageable pageable);
+    List<com.crimelens.backend.entity.ThreatType> findTopThreatTypes(Pageable pageable);
     
     default String findTopThreatType() {
         return findTopThreatTypes(PageRequest.of(0, 1))
-                .stream().findFirst().orElse("UNKNOWN");
+                .stream().map(Enum::name).findFirst().orElse("UNKNOWN");
     }
 }

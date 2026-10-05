@@ -23,6 +23,8 @@ function InputWithIcon({ value, onChange, placeholder, icon: Icon }) {
       <Icon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
       <input
         type="text"
+        aria-label={placeholder}
+        maxLength={2000}
         value={value}
         onChange={onChange}
         placeholder={placeholder}
@@ -91,7 +93,7 @@ export default function UrlTab() {
             <button
               key={i}
               onClick={() => { mode === 'url' ? setUrl(ex) : setUpi(ex); reset() }}
-              className="text-xs bg-slate-800 border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700 px-2.5 py-1.5 rounded-lg transition-colors font-mono"
+              className="text-xs bg-slate-800 border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700 px-2.5 py-1.5 rounded-lg transition-colors font-mono break-all max-w-full"
             >
               {ex}
             </button>

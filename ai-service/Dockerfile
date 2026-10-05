@@ -17,8 +17,9 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements*.txt .
+ARG INSTALL_MODELS=false
+RUN if [ "$INSTALL_MODELS" = "true" ]; then pip install --no-cache-dir -r requirements-models.txt; else pip install --no-cache-dir -r requirements.txt; fi
 COPY . .
 ENV PYTHONUNBUFFERED=1
 EXPOSE 8000

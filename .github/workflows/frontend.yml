@@ -46,8 +46,8 @@ jobs:
           npx eslint src/ \
             --ext .jsx,.js \
             --format stylish \
-            --max-warnings 20
-        continue-on-error: true
+            --max-warnings 0
+        continue-on-error: false
 
   build:
     name: Build React App

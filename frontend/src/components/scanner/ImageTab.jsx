@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { Upload, X, Image as ImageIcon, FileWarning } from 'lucide-react'
 import clsx from 'clsx'
 import LoadingSpinner from '../common/LoadingSpinner'
@@ -44,6 +44,7 @@ function ImagePreview({ file, preview, onRemove }) {
       <img src={preview} alt="Preview" className="w-full max-h-64 object-contain bg-slate-950" />
       <div className="absolute top-2 right-2">
         <button
+          aria-label="Remove image"
           onClick={onRemove}
           className="w-7 h-7 rounded-full bg-slate-900/80 border border-slate-700 flex items-center justify-center text-slate-400 hover:text-white transition-colors"
         >
@@ -67,6 +68,7 @@ export default function ImageTab() {
   const [dragging,  setDragging]  = useState(false)
   const [fileError, setFileError] = useState(null)
   const inputRef = useRef(null)
+  useEffect(() => () => { if (preview) URL.revokeObjectURL(preview) }, [preview])
   const { result, loading, error, scan, reset } = useScanResult()
 
   const validateAndSet = useCallback((f) => {
@@ -75,6 +77,7 @@ export default function ImageTab() {
       setFileError(`Unsupported file type: ${f.type}. Use JPEG, PNG, WebP, GIF or BMP.`)
       return
     }
+    if (!f.size) { setFileError('The file is empty.'); return }
     if (f.size > MAX_SIZE_MB * 1024 * 1024) {
       setFileError(`File too large: ${(f.size / 1024 / 1024).toFixed(1)}MB. Max ${MAX_SIZE_MB}MB.`)
       return
@@ -123,10 +126,10 @@ export default function ImageTab() {
         <p className="text-xs font-medium text-slate-300">What this checks:</p>
         <div className="grid grid-cols-2 gap-1">
           {[
-            '🤖 AI-generated images',
-            '✂️ Morphed / face-swapped photos',
+            '🤖 Optional AI model signals',
+            '✂️ Image manipulation heuristics',
             '🚨 Scam message screenshots',
-            '📄 Tampered documents (Aadhaar, PAN)',
+            '📄 Document structure and edit signals',
           ].map((item, i) => (
             <div key={i} className="flex items-center gap-1.5">
               <span className="text-xs text-slate-400">{item}</span>
@@ -136,6 +139,10 @@ export default function ImageTab() {
       </div>
       {!file ? (
         <div
+          role="button"
+          tabIndex={0}
+          aria-label="Upload image"
+          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); inputRef.current?.click() } }}
           onDrop={handleDrop}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}

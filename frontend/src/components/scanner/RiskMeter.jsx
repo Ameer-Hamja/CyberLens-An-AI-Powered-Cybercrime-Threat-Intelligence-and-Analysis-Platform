@@ -12,11 +12,13 @@ function getRiskColor(score) {
 }
 
 export default function RiskMeter({ score = 0, animate = true }) {
+  score = Number.isFinite(score) ? Math.max(0, Math.min(100, score)) : 0
   const [displayed, setDisplayed] = useState(animate ? 0 : score)
   const colors = getRiskColor(displayed)
 
   useEffect(() => {
     if (!animate) { setDisplayed(score); return }
+    let frame
     let start = null
     const duration = 900
     const from = 0
@@ -26,9 +28,10 @@ export default function RiskMeter({ score = 0, animate = true }) {
       const progress = Math.min((timestamp - start) / duration, 1)
       const eased = 1 - Math.pow(1 - progress, 3)
       setDisplayed(Math.round(from + (to - from) * eased))
-      if (progress < 1) requestAnimationFrame(step)
+      if (progress < 1) frame = requestAnimationFrame(step)
     }
-    requestAnimationFrame(step)
+    frame = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(frame)
   }, [score, animate])
 
   const dashOffset = CIRCUMFERENCE - (displayed / 100) * CIRCUMFERENCE

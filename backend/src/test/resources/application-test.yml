@@ -1,17 +1,20 @@
 spring:
   elasticsearch:
-    uris: http://localhost:9201  # unreachable → ElasticsearchQueryService falls back to empty via catch blocks
-
-  kafka:
-    bootstrap-servers: localhost:9093  # overridden by @DynamicPropertySource in Kafka tests
-
+    uris: http://localhost:9201
   flyway:
-    enabled: false  # Testcontainers tests use ddl-auto=create-drop instead
-
+    enabled: true
   jpa:
     hibernate:
-      ddl-auto: create-drop  # for Testcontainers
-
+      ddl-auto: validate
+  cache:
+    type: none
+  kafka:
+    listener:
+      auto-startup: false
+ingestion:
+  enabled: false
+  twitter:
+    enabled: false
 ai:
   service:
-    url: http://localhost:1  # unreachable → HealthController marks AI service as DOWN
+    url: http://localhost:1

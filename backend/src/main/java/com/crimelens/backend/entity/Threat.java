@@ -21,6 +21,9 @@ public class Threat {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    @Column(name = "content_hash", length = 64, unique = true)
+    private String contentHash;
+
     @Column(name = "source_url", length = 2048)
     private String sourceUrl;
 

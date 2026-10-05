@@ -13,6 +13,9 @@ public class ContentHasher {
 
     public String hash(ThreatRawEvent event) {
         try {
+            if (event == null || event.getSourceType() == null || event.getRawText() == null || event.getRawText().isBlank()) {
+                throw new IllegalArgumentException("Raw event requires source type and nonempty text");
+            }
             String canonical = event.getSourceType().name()
                     + "|" + normalizeUrl(event.getSourceUrl())
                     + "|" + normalizeText(event.getRawText());
@@ -29,11 +32,8 @@ public class ContentHasher {
         if (url == null || url.trim().isEmpty()) {
             return "unknown";
         }
-        String normalized = url.toLowerCase();
-        normalized = normalized.replaceAll("\\?.*", "");
-        if (normalized.endsWith("/")) {
-            normalized = normalized.substring(0, normalized.length() - 1);
-        }
+        String normalized = url.trim();
+        if (normalized.endsWith("/")) normalized = normalized.substring(0, normalized.length() - 1);
         return normalized;
     }
 
@@ -41,15 +41,7 @@ public class ContentHasher {
         if (text == null || text.trim().isEmpty()) {
             return "empty";
         }
-        String normalized = text.toLowerCase()
-                .replaceAll("[^a-z0-9 ]", "")
-                .replaceAll("\\s+", " ")
-                .trim();
-        
-        if (normalized.isEmpty()) {
-            return "empty";
-        }
-        
-        return normalized.length() > 500 ? normalized.substring(0, 500) : normalized;
+        return java.text.Normalizer.normalize(text, java.text.Normalizer.Form.NFKC)
+                .toLowerCase(java.util.Locale.ROOT).replaceAll("\\s+", " ").trim();
     }
 }

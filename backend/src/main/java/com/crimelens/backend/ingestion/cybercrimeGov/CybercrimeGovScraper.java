@@ -24,6 +24,7 @@ public class CybercrimeGovScraper {
         try {
             Document doc = Jsoup.connect(baseUrl + "/awareness")
                     .userAgent("Mozilla/5.0 (compatible; CrimeLens-Bot/1.0)")
+                    .followRedirects(false)
                     .timeout(10000)
                     .get();
 
@@ -65,8 +66,12 @@ public class CybercrimeGovScraper {
 
     private String fetchPageContent(String url) {
         try {
+            var target = java.net.URI.create(url);
+            var origin = java.net.URI.create(baseUrl);
+            if (!"https".equalsIgnoreCase(target.getScheme()) || !origin.getHost().equalsIgnoreCase(target.getHost()) || target.getUserInfo() != null) return "";
             String text = Jsoup.connect(url)
                     .userAgent("Mozilla/5.0 (compatible; CrimeLens-Bot/1.0)")
+                    .followRedirects(false)
                     .timeout(8000)
                     .get()
                     .body()

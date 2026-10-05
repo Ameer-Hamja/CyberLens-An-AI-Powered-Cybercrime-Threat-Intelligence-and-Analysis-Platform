@@ -15,10 +15,10 @@ export default function Sidebar() {
   return (
     <aside className="w-16 lg:w-56 border-r border-slate-800 bg-slate-900/50 flex flex-col shrink-0">
       <div className="h-14 flex items-center justify-center lg:px-6 border-b border-slate-800">
-        <Link to="/" className="flex items-center gap-2">
+        <Link to="/" aria-label="CyberLens dashboard" className="flex items-center gap-2">
           <Shield className="w-6 h-6 text-brand-400" />
           <span className="hidden lg:block text-sm font-bold text-white tracking-tight">
-            CrimeLens
+            CyberLens
           </span>
         </Link>
       </div>
@@ -27,6 +27,8 @@ export default function Sidebar() {
           <Link
             key={to}
             to={to}
+            aria-label={label}
+            aria-current={location.pathname === to ? 'page' : undefined}
             className={clsx(
               'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors',
               location.pathname === to

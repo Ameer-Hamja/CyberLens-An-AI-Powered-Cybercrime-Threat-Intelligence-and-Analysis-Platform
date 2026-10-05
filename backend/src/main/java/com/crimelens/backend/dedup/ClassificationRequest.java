@@ -13,6 +13,8 @@ import java.util.Map;
 @AllArgsConstructor
 public class ClassificationRequest {
     private String text;
+    @com.fasterxml.jackson.annotation.JsonProperty("source_url")
     private String sourceUrl;
+    @com.fasterxml.jackson.annotation.JsonProperty("raw_metadata")
     private Map<String, String> rawMetadata;
 }

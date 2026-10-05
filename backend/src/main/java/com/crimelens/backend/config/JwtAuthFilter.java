@@ -21,6 +21,7 @@ import java.util.Collections;
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
+    private final org.springframework.beans.factory.ObjectProvider<org.springframework.security.core.userdetails.UserDetailsService> userDetailsService;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -29,9 +30,14 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         if (StringUtils.hasText(token) && jwtUtil.validateToken(token)) {
             String username = jwtUtil.extractUsername(token);
-
+            org.springframework.security.core.userdetails.UserDetails user;
+            try { user = userDetailsService.getObject().loadUserByUsername(username); }
+            catch (org.springframework.security.core.userdetails.UsernameNotFoundException ex) {
+                filterChain.doFilter(request, response);
+                return;
+            }
             UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                    username, null, Collections.singletonList(new SimpleGrantedAuthority("ROLE_ADMIN"))
+                    user, null, user.getAuthorities()
             );
             authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 

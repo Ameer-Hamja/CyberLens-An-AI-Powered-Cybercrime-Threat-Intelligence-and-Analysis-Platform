@@ -71,9 +71,10 @@ public class RawThreatForwarder {
         if (response != null) {
             try {
                 String json = objectMapper.writeValueAsString(response);
-                kafkaTemplate.send(KafkaTopics.CLASSIFIED_THREATS, contentHash, json);
+                kafkaTemplate.send(KafkaTopics.CLASSIFIED_THREATS, contentHash, json).get(15, java.util.concurrent.TimeUnit.SECONDS);
             } catch (Exception e) {
-                log.error("Failed to serialize or publish classified response: {}", e.getMessage());
+                if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+                throw new IllegalStateException("Classified event publication failed", e);
             }
         }
     }
@@ -103,9 +104,9 @@ public class RawThreatForwarder {
                 .threatType(type.name())
                 .severity(3)
                 .confidence(0.5)
-                .detectedLanguage("en")
-                .geoTags(List.of("India"))
-                .citizenExplanation("Potential " + type.name().replace("_", " ").toLowerCase() + " threat detected. Exercise caution.")
+                .detectedLanguage("unknown")
+                .geoTags(List.of())
+                .citizenExplanation("Fallback rules used because the AI service was unavailable. Potential " + type.name().replace("_", " ").toLowerCase() + " threat detected. Exercise caution.")
                 .contentHash(contentHash)
                 .sourceUrl(event.getSourceUrl())
                 .sourceType(event.getSourceType())

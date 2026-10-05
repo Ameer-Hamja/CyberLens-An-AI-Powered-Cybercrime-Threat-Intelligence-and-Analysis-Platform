@@ -3,6 +3,7 @@ from enum import Enum
 from typing import List, Optional, Generic, TypeVar
 from datetime import datetime, timezone
 
+
 class ThreatType(str, Enum):
     PHISHING = "PHISHING"
     UPI_FRAUD = "UPI_FRAUD"
@@ -12,6 +13,7 @@ class ThreatType(str, Enum):
     RANSOMWARE = "RANSOMWARE"
     VISHING = "VISHING"
     OTHER = "OTHER"
+
 
 class ClassifyResponse(BaseModel):
     threat_type: ThreatType
@@ -23,6 +25,7 @@ class ClassifyResponse(BaseModel):
     classifier_used: str
     processing_time_ms: float
 
+
 class ScanResponse(BaseModel):
     risk_score: int
     threat_type: ThreatType
@@ -32,11 +35,13 @@ class ScanResponse(BaseModel):
     classifier_used: str
     processing_time_ms: float
 
+
 class SignalResultDTO(BaseModel):
     name: str
     detected: bool
     score: float
     detail: str
+
 
 class ImageScanResponse(BaseModel):
     verdict: str
@@ -52,6 +57,7 @@ class ImageScanResponse(BaseModel):
 
 T = TypeVar("T")
 
+
 class ApiResponse(BaseModel, Generic[T]):
     success: bool
     data: Optional[T] = None
@@ -59,11 +65,13 @@ class ApiResponse(BaseModel, Generic[T]):
     timestamp: str = ""
 
     @model_validator(mode="after")
-    def set_timestamp(self) -> 'ApiResponse':
+    def set_timestamp(self) -> "ApiResponse":
         if not self.timestamp:
-            self.timestamp = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+            self.timestamp = (
+                datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+            )
         return self
-        
+
     @classmethod
     def success_response(cls, data: T):
         return cls(success=True, data=data)

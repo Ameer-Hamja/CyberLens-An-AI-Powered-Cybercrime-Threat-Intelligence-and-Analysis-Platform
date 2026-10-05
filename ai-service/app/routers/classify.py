@@ -7,12 +7,18 @@ from app.classifiers.classifier_pipeline import ClassifierPipeline
 router = APIRouter(prefix="/classify", tags=["Classification"])
 logger = structlog.get_logger()
 
+
 def get_pipeline_dependency():
     from app.main import get_pipeline
+
     return get_pipeline()
 
+
 @router.post("/", response_model=ApiResponse[ClassifyResponse])
-async def classify_text(request: ClassifyRequest, pipeline: ClassifierPipeline = Depends(get_pipeline_dependency)):
+def classify_text(
+    request: ClassifyRequest,
+    pipeline: ClassifierPipeline = Depends(get_pipeline_dependency),
+):
     try:
         result = pipeline.classify(request)
         return ApiResponse.success_response(result)

@@ -12,11 +12,16 @@ import { formatNumber } from '../utils/formatters'
 export default function Dashboard() {
   const { stats, loading, error } = useStats()
   const [typeStats, setTypeStats] = useState(null)
+  const [typeError, setTypeError] = useState(null)
 
   useEffect(() => {
-    fetchStatsByType()
-      .then(setTypeStats)
-      .catch(() => setTypeStats(null))
+    let active = true
+    const load = () => fetchStatsByType()
+      .then(data => { if (active) { setTypeStats(data); setTypeError(null) } })
+      .catch(() => { if (active) setTypeError("Distribution unavailable") })
+    load()
+    const timer = setInterval(load, 60000)
+    return () => { active = false; clearInterval(timer) }
   }, [])
 
   if (loading && !stats) return <LoadingSpinner label="Loading dashboard..." />
@@ -71,7 +76,7 @@ export default function Dashboard() {
             <span className="text-sm font-medium text-white">Threat Distribution</span>
           </div>
           <div className="p-4 flex-1">
-            {typeStats ? (
+            {typeError ? <p role="alert" className="text-sm text-red-400">{typeError}</p> : typeStats ? (
               <ThreatTypeDonut data={typeStats} />
             ) : (
               <LoadingSpinner label="Loading..." />

@@ -25,9 +25,16 @@ public class ThreatPersistenceService {
     private final ThreatLocationRepository threatLocationRepository;
     private final ElasticsearchIndexService elasticsearchIndexService;
     private final ObjectMapper objectMapper;
+    private final com.crimelens.backend.dedup.BloomFilterService bloomFilterService;
 
     public Threat persist(ClassificationResponse response) {
+        if (response.getContentHash() == null || !response.getContentHash().matches("[0-9a-f]{64}")) {
+            throw new IllegalArgumentException("Classified event requires a SHA-256 fingerprint");
+        }
+        var existing = threatRepository.findByContentHash(response.getContentHash());
+        if (existing.isPresent()) return existing.get();
         Threat threat = new Threat();
+        threat.setContentHash(response.getContentHash());
         threat.setSourceUrl(response.getSourceUrl());
         threat.setRawText(truncate(response.getRawText(), 5000));
         threat.setThreatType(ThreatType.valueOf(response.getThreatType()));
@@ -60,7 +67,13 @@ public class ThreatPersistenceService {
             }
         }
 
-        elasticsearchIndexService.indexAsync(saved);
+        org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+            new org.springframework.transaction.support.TransactionSynchronization() {
+                @Override public void afterCommit() {
+                    bloomFilterService.add(response.getContentHash());
+                    elasticsearchIndexService.indexAsync(saved);
+                }
+            });
 
         log.info("Persisted threat: id={}, type={}, severity={}, geo={}", saved.getId(), saved.getThreatType(), saved.getSeverity(), response.getGeoTags());
 
