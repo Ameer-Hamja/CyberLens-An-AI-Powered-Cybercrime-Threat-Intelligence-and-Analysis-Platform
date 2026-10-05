@@ -37,13 +37,16 @@ export default function TextTab() {
       <div className="relative">
         <textarea
           value={text}
-          onChange={e => setText(e.target.value.slice(0, maxLen))}
+          aria-label="Suspicious message"
+          maxLength={maxLen}
+          onChange={e => { setText(e.target.value.slice(0, maxLen)); reset() }}
           placeholder="Paste the suspicious SMS, WhatsApp message, email text, or any content you want to check..."
           rows={5}
           className="input resize-none font-mono text-sm leading-relaxed"
         />
         {text && (
           <button
+            aria-label="Clear message"
             onClick={() => { setText(''); reset() }}
             className="absolute top-2 right-2 text-slate-600 hover:text-slate-400 transition-colors"
           >

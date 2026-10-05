@@ -12,7 +12,7 @@ export default function Navbar() {
     '/scan': 'Citizen Scanner',
     '/trends': 'Trend Analysis',
     '/search': 'Search Threats',
-  }[location.pathname] || 'CrimeLens'
+  }[location.pathname] || 'CyberLens'
 
   return (
     <header className="h-14 border-b border-slate-800 flex items-center justify-between px-6 bg-slate-900/50 backdrop-blur-sm sticky top-0 z-30">

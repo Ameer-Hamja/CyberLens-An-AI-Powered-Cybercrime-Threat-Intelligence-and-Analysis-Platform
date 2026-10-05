@@ -20,18 +20,7 @@ import static org.hamcrest.Matchers.*;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc
-@Testcontainers
-public class ScanControllerIntegrationTest {
-
-    @Container
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:15-alpine");
-
-    @Container
-    static GenericContainer<?> redis = new GenericContainer<>(DockerImageName.parse("redis/redis-stack:latest"))
-            .withExposedPorts(6379);
-
-    @Container
-    static KafkaContainer kafka = new KafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:7.6.1"));
+public class ScanControllerIntegrationTest extends IntegrationTestBase {
 
     @Autowired
     private MockMvc mockMvc;
@@ -71,7 +60,7 @@ public class ScanControllerIntegrationTest {
         // Make 10 valid requests
         for (int i = 0; i < 10; i++) {
             mockMvc.perform(post("/api/scan")
-                            .header("X-Forwarded-For", "192.168.1.100")
+                            .with(request -> { request.setRemoteAddr("192.168.1.100"); return request; })
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(payload))
                     .andExpect(status().isOk());
@@ -79,7 +68,7 @@ public class ScanControllerIntegrationTest {
         
         // 11th request should be rate limited
         mockMvc.perform(post("/api/scan")
-                        .header("X-Forwarded-For", "192.168.1.100")
+                        .with(request -> { request.setRemoteAddr("192.168.1.100"); return request; })
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload))
                 .andExpect(status().isTooManyRequests())

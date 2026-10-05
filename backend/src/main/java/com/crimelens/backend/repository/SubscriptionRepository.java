@@ -11,6 +11,7 @@ import java.util.UUID;
 public interface SubscriptionRepository extends JpaRepository<Subscription, UUID> {
     Optional<Subscription> findByEmail(String email);
     boolean existsByEmail(String email);
+    @org.springframework.transaction.annotation.Transactional
     void deleteByEmail(String email);
     org.springframework.data.domain.Page<Subscription> findAll(org.springframework.data.domain.Pageable pageable);
 }

@@ -22,6 +22,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Repository
 public interface ThreatRepository extends JpaRepository<Threat, UUID>, JpaSpecificationExecutor<Threat> {
 
+    java.util.Optional<Threat> findByContentHash(String hash);
+    boolean existsByContentHash(String hash);
+
     @Query(value = "SELECT tl.state_name FROM threat_locations tl " +
             "GROUP BY tl.state_name " +
             "ORDER BY COUNT(*) DESC LIMIT 1",

@@ -59,7 +59,7 @@ public class BloomFilterService {
             return result != null && result == 1L;
         } catch (Exception e) {
             log.warn("Bloom filter mightContain check failed for hash {}: {}", contentHash, e.getMessage());
-            return false;
+            throw new IllegalStateException("Bloom filter unavailable", e);
         }
     }
 
@@ -89,8 +89,8 @@ public class BloomFilterService {
                 long itemsInserted = 0;
                 
                 for (int i = 0; i < info.size(); i += 2) {
-                    String key = new String((byte[]) info.get(i));
-                    long value = (Long) info.get(i + 1);
+                    String key = new String((byte[]) info.get(i), StandardCharsets.UTF_8);
+                    long value = ((Number) info.get(i + 1)).longValue();
                     if ("Capacity".equals(key)) {
                         capacity = value;
                     } else if ("Number of items inserted".equals(key)) {

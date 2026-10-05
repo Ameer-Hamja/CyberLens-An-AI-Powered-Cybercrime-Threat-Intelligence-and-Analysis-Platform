@@ -29,20 +29,13 @@ public class RawThreatConsumer {
     public void consume(@Payload String message,
                         @Header(KafkaHeaders.RECEIVED_TOPIC) String topic,
                         @Header(KafkaHeaders.RECEIVED_PARTITION) int partition,
-                        @Header(KafkaHeaders.OFFSET) long offset) {
+                        @Header(KafkaHeaders.OFFSET) long offset,
+                        org.springframework.kafka.support.Acknowledgment acknowledgment) throws JsonProcessingException {
         log.debug("Received raw event: topic={}, partition={}, offset={}", topic, partition, offset);
 
-        try {
-            ThreatRawEvent event = objectMapper.readValue(message, ThreatRawEvent.class);
-            DeduplicationResult result = deduplicationService.check(event);
-
-            if (result.isAccepted()) {
-                rawThreatForwarder.forward(event, result.getContentHash());
-            }
-        } catch (JsonProcessingException e) {
-            log.error("Failed to deserialize raw event at offset {}: {}", offset, e.getMessage());
-        } catch (Exception e) {
-            log.error("Unexpected error processing event at offset {}: {}", offset, e.getMessage());
-        }
+        ThreatRawEvent event = objectMapper.readValue(message, ThreatRawEvent.class);
+        DeduplicationResult result = deduplicationService.check(event);
+        if (result.isAccepted()) rawThreatForwarder.forward(event, result.getContentHash());
+        acknowledgment.acknowledge();
     }
 }

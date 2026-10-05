@@ -20,7 +20,7 @@ public class ElasticsearchQueryService {
 
     private final ElasticsearchOperations elasticsearchOperations;
 
-    public List<ThreatDocument> search(String query, String threatType, String state, int page, int size) {
+    public org.springframework.data.domain.Page<ThreatDocument> search(String query, String threatType, String state, int page, int size) {
         try {
             NativeQuery searchQuery = NativeQuery.builder()
                     .withQuery(q -> q
@@ -33,10 +33,10 @@ public class ElasticsearchQueryService {
                                         )
                                 );
                                 if (threatType != null && !threatType.isEmpty()) {
-                                    b.filter(f -> f.term(t -> t.field("threatType.keyword").value(threatType)));
+                                    b.filter(f -> f.term(t -> t.field("threatType").value(threatType)));
                                 }
                                 if (state != null && !state.isEmpty()) {
-                                    b.filter(f -> f.term(t -> t.field("geoTags.keyword").value(state)));
+                                    b.filter(f -> f.term(t -> t.field("geoTags").value(state)));
                                 }
                                 return b;
                             })
@@ -45,12 +45,10 @@ public class ElasticsearchQueryService {
                     .build();
 
             SearchHits<ThreatDocument> hits = elasticsearchOperations.search(searchQuery, ThreatDocument.class);
-            return hits.stream()
-                    .map(SearchHit::getContent)
-                    .collect(Collectors.toList());
+            return new org.springframework.data.domain.PageImpl<>(hits.stream().map(SearchHit::getContent).toList(), PageRequest.of(page, size), hits.getTotalHits());
         } catch (Exception e) {
             log.error("ES search failed: {}", e.getMessage());
-            return Collections.emptyList();
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE, "Threat search is temporarily unavailable");
         }
     }
 
@@ -87,7 +85,7 @@ public class ElasticsearchQueryService {
                     .withQuery(q -> q.matchAll(ma -> ma))
                     .withAggregation("by_type",
                             co.elastic.clients.elasticsearch._types.aggregations.Aggregation.of(a -> a
-                                    .terms(t -> t.field("threatType.keyword").size(50))))
+                                    .terms(t -> t.field("threatType").size(50))))
                     .withMaxResults(0)
                     .build();
 

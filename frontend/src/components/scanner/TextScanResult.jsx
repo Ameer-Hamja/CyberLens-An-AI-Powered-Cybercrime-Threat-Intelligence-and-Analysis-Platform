@@ -27,7 +27,7 @@ export default function TextScanResult({ result, onReset }) {
         )}>
           {isDangerous
             ? 'Warning — This looks suspicious'
-            : 'Looks safe — No major threats detected'}
+            : 'No strong threat patterns detected — safety is unverified'}
         </span>
       </div>
       <div className="p-4 space-y-5">

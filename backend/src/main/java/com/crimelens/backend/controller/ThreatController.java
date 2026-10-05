@@ -6,8 +6,6 @@ import com.crimelens.backend.entity.Subscription;
 import com.crimelens.backend.entity.Threat;
 import com.crimelens.backend.entity.ThreatType;
 import com.crimelens.backend.mapper.ThreatMapper;
-import com.crimelens.backend.entity.Threat;
-import com.crimelens.backend.entity.ThreatType;
 import com.crimelens.backend.pipeline.ElasticsearchQueryService;
 import com.crimelens.backend.pipeline.ThreatDocument;
 import com.crimelens.backend.repository.SubscriptionRepository;
@@ -115,10 +113,12 @@ public class ThreatController {
             @RequestParam(required = false) String threatType,
             @RequestParam(required = false) Integer minSeverity) {
 
+        if (size < 1) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Size must be positive");
+        if (minSeverity != null && (minSeverity < 1 || minSeverity > 5)) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Severity must be between 1 and 5");
         if (size > 100) size = 100;
         if (page < 0) page = 0;
 
-        Specification<Threat> spec = Specification.where(null);
+        Specification<Threat> spec = (root, query, cb) -> cb.conjunction();
         if (threatType != null && !threatType.isEmpty()) {
             spec = spec.and(ThreatSpecification.hasType(parseThreatType(threatType)));
         }
@@ -181,17 +181,19 @@ public class ThreatController {
             @RequestParam(required = false) String threatType,
             @RequestParam(required = false) String state) {
 
+        if (page < 0 || size < 1 || size > 100 || (long) page * size >= 10000) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid search pagination");
+        if (threatType != null && !threatType.isBlank()) threatType = parseThreatType(threatType).name();
         String query = q.trim();
-        if (query.isEmpty()) {
+        if (query.length() < 2 || query.length() > 200) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Search query cannot be blank");
         }
 
-        List<ThreatDocument> results = elasticsearchQueryService.search(query, threatType, state, page, size);
+        Page<ThreatDocument> results = elasticsearchQueryService.search(query, threatType, state, page, size);
 
         return ApiResponse.success(Map.of(
-                "results", results,
+                "results", results.getContent(),
                 "query", query,
-                "total", results.size()
+                "total", results.getTotalElements()
         ));
     }
 

@@ -10,10 +10,11 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 
 @Component
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "ingestion.enabled", havingValue = "true", matchIfMissing = true)
 @RequiredArgsConstructor
 public class StatsScheduler {
 
-    private final ThreatRepository threatRepository;
+    private final com.crimelens.backend.controller.StatsController statsController;
     private final WebSocketBroadcastService webSocketBroadcastService;
 
     @Scheduled(fixedDelay = 60000, initialDelay = 30000)
@@ -23,15 +24,6 @@ public class StatsScheduler {
     }
 
     private StatsDTO buildStats() {
-        long totalThreats = threatRepository.count();
-        long threatsToday = threatRepository.countByCreatedAtAfter(Instant.now().truncatedTo(ChronoUnit.DAYS));
-        String topState = threatRepository.findTopState();
-        String topThreatType = threatRepository.findTopThreatType();
-        return StatsDTO.builder()
-                .totalThreats(totalThreats)
-                .threatsToday(threatsToday)
-                .topState(topState)
-                .topThreatType(topThreatType)
-                .build();
+        return statsController.getStats().getData();
     }
 }

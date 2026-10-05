@@ -38,6 +38,7 @@ export default function TrendChart({ data }) {
   )
 
   const threatTypes = [...new Set(data.trends.map(t => t.threatType))]
+  chartData.forEach(row => threatTypes.forEach(type => { row[type] ??= 0 }))
 
   return (
     <ResponsiveContainer width="100%" height={300}>

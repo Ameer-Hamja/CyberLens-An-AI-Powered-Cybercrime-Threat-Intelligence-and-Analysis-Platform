@@ -18,12 +18,12 @@ export default function Trends() {
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <TrendingUp className="w-5 h-5 text-brand-400" />
           <h1 className="text-lg font-semibold text-white">Threat Trends</h1>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1">
           <Calendar className="w-4 h-4 text-slate-500" />
           {DAY_OPTIONS.map(d => (
             <button

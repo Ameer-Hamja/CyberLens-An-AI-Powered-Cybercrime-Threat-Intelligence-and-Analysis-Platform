@@ -21,6 +21,7 @@ class DeduplicationServiceTest {
 
     @Mock
     private ContentHasher contentHasher;
+    @Mock private com.crimelens.backend.repository.ThreatRepository threatRepository;
 
     private DeduplicationService deduplicationService;
     private SimpleMeterRegistry meterRegistry;
@@ -28,7 +29,7 @@ class DeduplicationServiceTest {
     @BeforeEach
     void setUp() {
         meterRegistry = new SimpleMeterRegistry();
-        deduplicationService = new DeduplicationService(bloomFilterService, contentHasher, meterRegistry);
+        deduplicationService = new DeduplicationService(bloomFilterService, contentHasher, meterRegistry, threatRepository);
     }
 
     @Test
@@ -41,7 +42,7 @@ class DeduplicationServiceTest {
 
         assertTrue(result.isAccepted());
         assertEquals("hash123", result.getContentHash());
-        verify(bloomFilterService).add("hash123");
+        verify(bloomFilterService, never()).add("hash123");
         assertEquals(1.0, meterRegistry.counter("dedup.events.new").count());
     }
 
@@ -50,6 +51,7 @@ class DeduplicationServiceTest {
         ThreatRawEvent event = ThreatRawEvent.builder().sourceType(SourceType.TWITTER).build();
         when(contentHasher.hash(event)).thenReturn("hash123");
         when(bloomFilterService.mightContain("hash123")).thenReturn(true);
+        when(threatRepository.existsByContentHash("hash123")).thenReturn(true);
 
         DeduplicationResult result = deduplicationService.check(event);
 

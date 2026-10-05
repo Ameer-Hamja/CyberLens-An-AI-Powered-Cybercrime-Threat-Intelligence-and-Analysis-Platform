@@ -76,6 +76,7 @@ public class HealthController {
     private final StringRedisTemplate stringRedisTemplate;
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final DataSource dataSource;
+    private final RestTemplate restTemplate;
 
     @Value("${ai.service.url:http://localhost:8000}")
     private String aiServiceUrl;
@@ -91,7 +92,7 @@ public class HealthController {
             threatRepository.count();
             components.put("database", "UP");
         } catch (Exception e) {
-            components.put("database", "DOWN: " + e.getMessage());
+            components.put("database", "DOWN");
             allUp = false;
         }
 
@@ -100,23 +101,21 @@ public class HealthController {
             stringRedisTemplate.opsForValue().set("health:check", "ok", Duration.ofSeconds(5));
             components.put("redis", "UP");
         } catch (Exception e) {
-            components.put("redis", "DOWN: " + e.getMessage());
+            components.put("redis", "DOWN");
             allUp = false;
         }
 
         // Kafka
         try {
-            if (kafkaTemplate.getDefaultTopic() != null || true) { // just accessing it
-                components.put("kafka", "UP");
-            }
+            kafkaTemplate.execute(producer -> producer.partitionsFor("raw-threats"));
+            components.put("kafka", "UP");
         } catch (Exception e) {
-            components.put("kafka", "DOWN: " + e.getMessage());
+            components.put("kafka", "DOWN");
             allUp = false;
         }
 
         // AI Service
         try {
-            RestTemplate restTemplate = new RestTemplate();
             boolean ok = restTemplate.getForEntity(aiServiceUrl + "/health", String.class).getStatusCode().is2xxSuccessful();
             if (ok) {
                 components.put("aiService", "UP");
@@ -125,7 +124,7 @@ public class HealthController {
                 allUp = false;
             }
         } catch (Exception e) {
-            components.put("aiService", "DOWN: " + e.getMessage());
+            components.put("aiService", "DOWN");
             allUp = false;
         }
 

@@ -22,6 +22,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Component
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "ingestion.enabled", havingValue = "true", matchIfMissing = true)
 @Slf4j
 @RequiredArgsConstructor
 public class CertInRssIngestionJob {

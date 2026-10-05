@@ -47,16 +47,9 @@ public class ClassifiedThreatConsumer {
             pipelineMetrics.recordProcessed(response.getSourceType());
             pipelineMetrics.recordPersisted();
             acknowledgment.acknowledge();
-        } catch (JsonProcessingException e) {
-            log.error("Poison pill at offset {}: {}", offset, e.getMessage());
-            acknowledgment.acknowledge();
-            pipelineMetrics.recordFailed();
-        } catch (DataIntegrityViolationException e) {
-            log.warn("Duplicate threat skipped at offset {}: {}", offset, e.getMessage());
-            acknowledgment.acknowledge();
         } catch (Exception e) {
-            log.error("Failed to process classified event at offset {}: {}", offset, e.getMessage());
             pipelineMetrics.recordFailed();
+            throw new IllegalStateException("Classified event processing failed", e);
         }
     }
 }

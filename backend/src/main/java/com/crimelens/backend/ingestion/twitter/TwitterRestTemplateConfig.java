@@ -34,8 +34,8 @@ public class TwitterRestTemplateConfig {
         };
 
         return builder
-                .setConnectTimeout(Duration.ofSeconds(5))
-                .setReadTimeout(Duration.ofSeconds(10))
+                .connectTimeout(Duration.ofSeconds(5))
+                .readTimeout(Duration.ofSeconds(10))
                 .additionalInterceptors(interceptor)
                 .messageConverters(converter)
                 .build();

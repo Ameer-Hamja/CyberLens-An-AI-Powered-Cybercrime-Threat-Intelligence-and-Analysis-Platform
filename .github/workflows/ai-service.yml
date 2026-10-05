@@ -104,7 +104,7 @@ jobs:
             --select E,W,F \
             --ignore E501 \
             --output-format=github
-        continue-on-error: true
+        continue-on-error: false
 
   deploy:
     name: Deploy to Hugging Face Spaces

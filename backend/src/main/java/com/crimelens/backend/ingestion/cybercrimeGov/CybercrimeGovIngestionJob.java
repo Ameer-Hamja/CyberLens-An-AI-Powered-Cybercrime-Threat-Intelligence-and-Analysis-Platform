@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 
 @Component
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "ingestion.enabled", havingValue = "true", matchIfMissing = true)
 @Slf4j
 @RequiredArgsConstructor
 public class CybercrimeGovIngestionJob {

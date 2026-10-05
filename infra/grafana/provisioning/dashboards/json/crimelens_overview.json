@@ -135,7 +135,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "kafka_consumer_group_lag{topic=\"classified-threats\"}",
+          "expr": "kafka_consumergroup_lag{topic=\"classified-threats\"}",
           "legendFormat": "lag"
         }
       ],

@@ -12,7 +12,12 @@ import java.time.Duration;
 
 @Configuration
 @EnableCaching
-public class CacheConfig {
+@org.springframework.context.annotation.Profile("!test")
+public class CacheConfig implements org.springframework.cache.annotation.CachingConfigurer {
+
+    @Override public org.springframework.cache.interceptor.CacheErrorHandler errorHandler() {
+        return new org.springframework.cache.interceptor.LoggingCacheErrorHandler();
+    }
 
     @Bean
     public CacheManager cacheManager(RedisConnectionFactory factory) {

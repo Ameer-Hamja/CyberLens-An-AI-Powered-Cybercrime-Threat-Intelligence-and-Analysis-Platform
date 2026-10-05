@@ -93,7 +93,7 @@ public class AuthController {
             
             LoginResponseDTO response = new LoginResponseDTO(
                     token,
-                    Instant.now().plusMillis(86400000).toString(),
+                    Instant.now().plusMillis(jwtUtil.getExpirationMs()).toString(),
                     request.getUsername(),
                     "ADMIN"
             );
@@ -109,7 +109,7 @@ public class AuthController {
 
     @Operation(summary = "Validate existing JWT token")
     @GetMapping("/validate")
-    public ResponseEntity<ApiResponse<String>> validateToken(@RequestHeader("Authorization") String authHeader) {
+    public ResponseEntity<ApiResponse<String>> validateToken(@RequestHeader(value = "Authorization", required = false) String authHeader) {
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             String token = authHeader.substring(7);
             if (jwtUtil.validateToken(token)) {

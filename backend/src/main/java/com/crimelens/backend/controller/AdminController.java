@@ -92,6 +92,8 @@ public class AdminController {
     private final CacheManager cacheManager;
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final ObjectMapper objectMapper;
+    private final com.crimelens.backend.repository.ThreatLocationRepository threatLocationRepository;
+    private final com.crimelens.backend.pipeline.ElasticsearchIndexService elasticsearchIndexService;
 
     @Operation(summary = "Get admin dashboard overview")
     @GetMapping("/dashboard")
@@ -125,11 +127,16 @@ public class AdminController {
 
     @Operation(summary = "Delete threat by ID")
     @DeleteMapping("/threats/{id}")
+    @org.springframework.transaction.annotation.Transactional
     public ApiResponse<String> deleteThreat(@PathVariable UUID id) {
         if (!threatRepository.existsById(id)) {
             throw new EntityNotFoundException("Threat not found with id: " + id);
         }
+        threatLocationRepository.deleteAll(threatLocationRepository.findByThreat_Id(id));
         threatRepository.deleteById(id);
+        org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(new org.springframework.transaction.support.TransactionSynchronization() {
+            @Override public void afterCommit() { elasticsearchIndexService.deleteAsync(id); }
+        });
         
         cacheManager.getCacheNames().forEach(name -> {
             var cache = cacheManager.getCache(name);
@@ -164,6 +171,7 @@ public class AdminController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         
+        if (page < 0 || size < 1 || size > 100) throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST, "Invalid pagination");
         Page<Subscription> subs = subscriptionRepository.findAll(
                 PageRequest.of(page, size, Sort.by("createdAt").descending()));
         
@@ -183,11 +191,12 @@ public class AdminController {
                     .metadata(Map.of("trigger", "admin", "admin_id", "system"))
                     .build();
                     
-            kafkaTemplate.send(KafkaTopics.RAW_THREATS, objectMapper.writeValueAsString(testEvent));
+            kafkaTemplate.send(KafkaTopics.RAW_THREATS, objectMapper.writeValueAsString(testEvent)).get(15, java.util.concurrent.TimeUnit.SECONDS);
             return ApiResponse.success("Test event published to raw-threats topic");
         } catch (Exception e) {
             log.error("Failed to publish test event: {}", e.getMessage());
-            return ApiResponse.error("Failed to trigger ingestion: " + e.getMessage());
+            if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE, "Failed to publish ingestion event");
         }
     }
 

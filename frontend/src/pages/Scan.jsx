@@ -10,7 +10,7 @@ import ErrorBoundary from '../components/common/ErrorBoundary'
 const TABS = [
   { key: 'text',  label: 'SMS / Text', icon: MessageSquare, desc: 'Paste suspicious message content' },
   { key: 'url',   label: 'URL / UPI',  icon: Link2,          desc: 'Check a link or UPI ID' },
-  { key: 'image', label: 'Image',      icon: Image,          desc: 'Detect AI, morphed, or scam images' },
+  { key: 'image', label: 'Image',      icon: Image,          desc: 'Check image heuristics and scam text' },
 ]
 
 export default function Scan() {
@@ -36,6 +36,8 @@ export default function Scan() {
             {TABS.map(({ key, label, icon: Icon }) => (
               <button
                 key={key}
+                aria-label={label}
+                aria-pressed={activeTab === key}
                 onClick={() => setActiveTab(key)}
                 className={clsx(
                   'flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-sm font-medium transition-all',
@@ -66,7 +68,7 @@ export default function Scan() {
             <p className="text-sm font-medium text-white">How it works</p>
             {[
               { step: '1', title: 'Paste or upload', desc: 'Drop in the suspicious content — text, link, UPI ID, or image.' },
-              { step: '2', title: 'AI analysis', desc: 'Our multilingual AI checks it against 40+ scam patterns and threat intelligence.' },
+              { step: '2', title: 'AI analysis', desc: 'Pattern rules assess suspicious text. Images use heuristics and optional configured models.' },
               { step: '3', title: 'Plain-language verdict', desc: 'Get a risk score and clear explanation — no jargon, no technical reports.' },
             ].map(({ step, title, desc }) => (
               <div key={step} className="flex gap-3">

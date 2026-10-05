@@ -9,12 +9,6 @@ on:
       - 'backend/**'
       - '.github/workflows/backend.yml'
   workflow_dispatch:
-    inputs:
-      skip_tests:
-        description: 'Skip tests (emergency deploy only)'
-        required: false
-        default: false
-        type: boolean
 
 env:
   JAVA_VERSION: '25'
@@ -33,32 +27,6 @@ jobs:
     name: Run Tests
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    if: ${{ github.event.inputs.skip_tests != 'true' }}
-
-    services:
-      postgres:
-        image: postgis/postgis:16-3.4
-        env:
-          POSTGRES_DB: crimelens_test
-          POSTGRES_USER: crimelens
-          POSTGRES_PASSWORD: crimelens_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-      redis:
-        image: redis/redis-stack:latest
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
 
     steps:
       - name: Checkout repository
@@ -93,8 +61,8 @@ jobs:
           ELASTICSEARCH_URIS: http://localhost:9200
           JWT_SECRET: test_secret_key_minimum_32_characters_long
           TWITTER_INGESTION_ENABLED: false
-          SPRING_FLYWAY_ENABLED: false
-          SPRING_JPA_HIBERNATE_DDL_AUTO: create-drop
+          SPRING_FLYWAY_ENABLED: true
+          SPRING_JPA_HIBERNATE_DDL_AUTO: validate
         run: |
           mvn test \
             -Dtest="*Test,!*IntegrationTest" \
@@ -115,8 +83,8 @@ jobs:
           ELASTICSEARCH_URIS: http://localhost:9200
           JWT_SECRET: test_secret_key_minimum_32_characters_long
           TWITTER_INGESTION_ENABLED: false
-          SPRING_FLYWAY_ENABLED: false
-          SPRING_JPA_HIBERNATE_DDL_AUTO: create-drop
+          SPRING_FLYWAY_ENABLED: true
+          SPRING_JPA_HIBERNATE_DDL_AUTO: validate
         run: |
           mvn test \
             -Dtest="*IntegrationTest" \
@@ -139,8 +107,7 @@ jobs:
     if: |
       always() &&
       vars.DEPLOY_ENABLED == 'true' &&
-      (needs.test.result == 'success' ||
-       needs.test.result == 'skipped') &&
+      needs.test.result == 'success' &&
       github.ref == 'refs/heads/main' &&
       github.event_name != 'pull_request'
     outputs:
@@ -257,7 +224,7 @@ jobs:
             AI_SERVICE_URL="$AI_SERVICE_URL" \
             ELASTICSEARCH_URIS="$ELASTICSEARCH_URIS" \
             JWT_SECRET="$JWT_SECRET" \
-            TWITTER_INGESTION_ENABLED="true" \
+            TWITTER_INGESTION_ENABLED="false" \
             TWITTER_BEARER_TOKEN="$TWITTER_BEARER_TOKEN" \
             FRONTEND_URL="$FRONTEND_URL" \
             ADMIN_PASSWORD="$ADMIN_PASSWORD" \

@@ -46,7 +46,7 @@ groups:
 
       - alert: KafkaConsumerLagHigh
         expr: |
-          kafka_consumer_group_lag{topic="classified-threats"} > 500
+          kafka_consumergroup_lag{topic="classified-threats"} > 500
         for: 5m
         labels:
           severity: warning

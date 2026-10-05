@@ -1,29 +1,33 @@
 import re
 from typing import List
 
+
 class TextCleaner:
     def __init__(self):
         self._last_urls: List[str] = []
-        self.url_pattern = re.compile(r'https?://\S+')
-        self.upi_pattern = re.compile(r'[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}')
-        self.phone_pattern = re.compile(r'(?:\+91|0)?[6-9]\d{9}')
+        self.url_pattern = re.compile(r"https?://\S+")
+        self.upi_pattern = re.compile(r"[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}")
+        self.phone_pattern = re.compile(r"(?:\+91|0)?[6-9]\d{9}")
 
     def clean(self, text: str, max_text_length: int = 512) -> str:
         if not text:
             return ""
         # 1. Decode unicode escapes
-        text = text.encode('utf-8').decode('unicode_escape', 'ignore')
+        import html
+        import unicodedata
+
+        text = unicodedata.normalize("NFKC", html.unescape(text))
         # 2. Remove HTML tags
-        text = re.sub(r'<[^>]+>', ' ', text)
+        text = re.sub(r"<[^>]+>", " ", text)
         # 3. Remove URLs and store them
         self._last_urls = self.extract_urls(text)
-        text = self.url_pattern.sub(' ', text)
+        text = self.url_pattern.sub(" ", text)
         # 4. Normalize whitespace
-        text = re.sub(r'\s+', ' ', text).strip()
+        text = re.sub(r"\s+", " ", text).strip()
         # 5. Lowercase for classification
         text = text.lower()
         # 6. Truncate approx
-        max_chars = int(max_text_length * 1.3)
+        max_chars = 5000
         if len(text) > max_chars:
             text = text[:max_chars]
         return text
@@ -47,7 +51,21 @@ class TextCleaner:
     def is_url(self, text: str) -> bool:
         if not text:
             return False
-        return bool(self.url_pattern.match(text.strip()))
+        from urllib.parse import urlsplit
+
+        value = text.strip()
+        if any(char.isspace() for char in value):
+            return False
+        try:
+            parsed = urlsplit(value if "://" in value else "https://" + value)
+            return (
+                parsed.scheme in {"http", "https"}
+                and bool(parsed.hostname)
+                and "." in parsed.hostname
+                and "@" not in value
+            )
+        except ValueError:
+            return False
 
     def is_upi_id(self, text: str) -> bool:
         if not text:

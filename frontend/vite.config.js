@@ -4,5 +4,5 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: { port: 3000, proxy: { '/api': { target: 'http://localhost:8080', changeOrigin: true }, '/ws': { target: 'http://localhost:8080', changeOrigin: true, ws: true } } },
-  build: { outDir: 'dist', sourcemap: true }
+  build: { outDir: 'dist', sourcemap: true, rollupOptions: { output: { manualChunks: { charts: ['recharts'], map: ['react-leaflet', 'leaflet'], vendor: ['react', 'react-dom', 'react-router-dom'] } } } }
 })

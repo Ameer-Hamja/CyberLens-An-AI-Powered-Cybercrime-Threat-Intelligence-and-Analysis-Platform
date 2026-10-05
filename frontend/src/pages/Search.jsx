@@ -10,17 +10,22 @@ export default function Search() {
   const [loading, setLoading] = useState(false)
   const [searched, setSearched] = useState(false)
   const [total, setTotal] = useState(0)
+  const [error, setError] = useState(null)
+  const [submittedQuery, setSubmittedQuery] = useState('')
 
   const handleSearch = useCallback(async (e) => {
     e?.preventDefault()
     if (!query.trim() || query.trim().length < 2) return
     setLoading(true)
     setSearched(true)
+    setError(null)
+    setSubmittedQuery(query.trim())
     try {
       const data = await searchThreats(query.trim(), { page: 0, size: 20 })
       setResults(data?.results || [])
       setTotal(data?.total || 0)
     } catch {
+      setError('Search is unavailable. Please try again.')
       setResults([])
       setTotal(0)
     } finally {
@@ -41,6 +46,8 @@ export default function Search() {
         <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
         <input
           type="text"
+          aria-label="Search threats"
+          maxLength={200}
           value={query}
           onChange={e => setQuery(e.target.value)}
           placeholder="Search for keywords, UPI IDs, URLs, phone numbers..."
@@ -58,21 +65,22 @@ export default function Search() {
         </button>
       </form>
 
-      {searched && !loading && (
+      {searched && !loading && !error && (
         <p className="text-xs text-slate-500">
           {total > 0
-            ? `${total} result${total !== 1 ? 's' : ''} for "${query}"`
-            : `No results for "${query}"`}
+            ? `${total} result${total !== 1 ? 's' : ''} for "${submittedQuery}"`
+            : `No results for "${submittedQuery}"`}
         </p>
       )}
 
       <div className="space-y-2">
+        {error && <EmptyState title="Search unavailable" description={error} />}
         {loading && (
           <div className="flex justify-center py-12">
             <Loader2 className="w-6 h-6 text-brand-400 animate-spin" />
           </div>
         )}
-        {!loading && searched && results.length === 0 && (
+        {!loading && !error && searched && results.length === 0 && (
           <EmptyState
             title="No threats found"
             description="Try different keywords or broaden your search."
