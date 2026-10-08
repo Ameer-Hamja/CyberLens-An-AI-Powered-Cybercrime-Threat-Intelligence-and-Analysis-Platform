@@ -26,6 +26,9 @@ class RawThreatConsumerTest {
     @Mock
     private ObjectMapper objectMapper;
 
+    @Mock
+    private org.springframework.kafka.support.Acknowledgment acknowledgment;
+
     @InjectMocks
     private RawThreatConsumer consumer;
 
@@ -42,9 +45,10 @@ class RawThreatConsumerTest {
         when(objectMapper.readValue(validJson, ThreatRawEvent.class)).thenReturn(event);
         when(deduplicationService.check(event)).thenReturn(DeduplicationResult.accepted("hash123"));
 
-        consumer.consume(validJson, "raw-threats", 0, 100L);
+        consumer.consume(validJson, "raw-threats", 0, 100L, acknowledgment);
 
         verify(rawThreatForwarder).forward(event, "hash123");
+        verify(acknowledgment).acknowledge();
     }
 
     @Test
@@ -52,7 +56,7 @@ class RawThreatConsumerTest {
         when(objectMapper.readValue(validJson, ThreatRawEvent.class)).thenReturn(event);
         when(deduplicationService.check(event)).thenReturn(DeduplicationResult.duplicate("hash123"));
 
-        consumer.consume(validJson, "raw-threats", 0, 100L);
+        consumer.consume(validJson, "raw-threats", 0, 100L, acknowledgment);
 
         verify(rawThreatForwarder, never()).forward(any(), anyString());
     }
@@ -63,8 +67,19 @@ class RawThreatConsumerTest {
         when(objectMapper.readValue(badJson, ThreatRawEvent.class)).thenThrow(new JsonProcessingException("error") {});
 
         // Should not throw
-        consumer.consume(badJson, "raw-threats", 0, 100L);
+        consumer.consume(badJson, "raw-threats", 0, 100L, acknowledgment);
         
         verify(deduplicationService, never()).check(any());
     }
+    @Test
+    void failedDelivery_isRetried_withoutAcknowledgmentOrBloomMark() throws Exception {
+        when(objectMapper.readValue(validJson, ThreatRawEvent.class)).thenReturn(event);
+        when(deduplicationService.check(event)).thenReturn(DeduplicationResult.accepted("hash123"));
+        doThrow(new IllegalStateException("Kafka unavailable")).when(rawThreatForwarder).forward(event, "hash123");
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+                () -> consumer.consume(validJson, "raw-threats", 0, 100L, acknowledgment));
+        verify(acknowledgment, never()).acknowledge();
+        verify(deduplicationService, never()).markForwarded(anyString());
+    }
+
 }

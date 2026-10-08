@@ -29,6 +29,7 @@ public class CertInRssIngestionJob {
     private final RomeFeedParser romeFeedParser;
     private final IngestionPublisher ingestionPublisher;
     private final IngestionMetrics metrics;
+    private final com.crimelens.backend.ingestion.MockSourceFallback fallback;
 
     @Value("${ingestion.certIn.feedUrl}")
     private String feedUrl;
@@ -41,6 +42,7 @@ public class CertInRssIngestionJob {
         try {
             metrics.recordJobExecution(SourceType.CERT_IN);
             List<SyndEntry> entries = romeFeedParser.parse(feedUrl);
+            if (entries.isEmpty()) { fallback.publish(SourceType.CERT_IN); return; }
             int count = 0;
 
             for (SyndEntry entry : entries) {
@@ -68,6 +70,7 @@ public class CertInRssIngestionJob {
             }
             log.info("Successfully fetched and published {} events from CERT-In", count);
         } catch (Exception e) {
+            fallback.publish(SourceType.CERT_IN);
             log.error("Error during CERT-In ingestion job execution", e);
         }
     }

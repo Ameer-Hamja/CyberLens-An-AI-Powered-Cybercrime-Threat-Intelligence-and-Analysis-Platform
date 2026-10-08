@@ -52,11 +52,11 @@ public class ClassifiedThreatConsumer {
             acknowledgment.acknowledge();
             pipelineMetrics.recordFailed();
         } catch (DataIntegrityViolationException e) {
-            log.warn("Duplicate threat skipped at offset {}: {}", offset, e.getMessage());
-            acknowledgment.acknowledge();
+            throw e;
         } catch (Exception e) {
             log.error("Failed to process classified event at offset {}: {}", offset, e.getMessage());
             pipelineMetrics.recordFailed();
+            throw new IllegalStateException("Classified event processing failed", e);
         }
     }
 }

@@ -14,15 +14,15 @@ route:
   group_wait: 30s
   group_interval: 5m
   repeat_interval: 4h
-  receiver: 'crimelens-email'
+  receiver: 'null'
   routes:
     - match:
         severity: critical
-      receiver: 'crimelens-email'
+      receiver: 'null'
       repeat_interval: 1h
     - match:
         severity: warning
-      receiver: 'crimelens-email'
+      receiver: 'null'
       repeat_interval: 4h
     - match:
         severity: info
@@ -32,8 +32,9 @@ receivers:
   - name: 'crimelens-email'
     email_configs:
       - to: 'ameer@crimelens.in'
-        subject: '[CrimeLens][{{ .Status | toUpper }}] {{ .GroupLabels.alertname }}'
-        body: |
+        headers:
+          Subject: '[CrimeLens][{{ .Status | toUpper }}] {{ .GroupLabels.alertname }}'
+        text: |
           {{ range .Alerts }}
           Alert: {{ .Annotations.summary }}
           Description: {{ .Annotations.description }}

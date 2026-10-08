@@ -26,12 +26,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.hamcrest.Matchers.*;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@org.springframework.test.context.ActiveProfiles("test")
 @AutoConfigureMockMvc
+@org.springframework.test.annotation.DirtiesContext(classMode = org.springframework.test.annotation.DirtiesContext.ClassMode.AFTER_CLASS)
 @Testcontainers
 public class ThreatControllerIntegrationTest {
 
     @Container
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:15-alpine");
+    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>(DockerImageName.parse("postgis/postgis:15-3.3").asCompatibleSubstituteFor("postgres"));
 
     @Container
     static GenericContainer<?> redis = new GenericContainer<>(DockerImageName.parse("redis/redis-stack:latest"))
@@ -40,14 +42,28 @@ public class ThreatControllerIntegrationTest {
     @Container
     static KafkaContainer kafka = new KafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:7.6.1"));
 
+    @org.springframework.test.context.DynamicPropertySource
+    static void properties(org.springframework.test.context.DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url", postgres::getJdbcUrl);
+        registry.add("spring.datasource.username", postgres::getUsername);
+        registry.add("spring.datasource.password", postgres::getPassword);
+        registry.add("spring.data.redis.host", redis::getHost);
+        registry.add("spring.data.redis.port", () -> redis.getMappedPort(6379));
+        registry.add("spring.kafka.bootstrap-servers", kafka::getBootstrapServers);
+    }
+
     @Autowired
     private MockMvc mockMvc;
 
     @Autowired
     private ThreatRepository threatRepository;
 
+    @Autowired
+    private org.springframework.cache.CacheManager cacheManager;
+
     @BeforeEach
     void setUp() {
+        cacheManager.getCacheNames().forEach(name -> cacheManager.getCache(name).clear());
         threatRepository.deleteAll();
         
         Threat t1 = new Threat();
@@ -136,4 +152,18 @@ public class ThreatControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data", is("Already subscribed")));
     }
+    @Autowired
+    private com.crimelens.backend.repository.SubscriptionRepository subscriptions;
+
+    @Test
+    void unsubscribe_removesSubscriptionTransactionally() throws Exception {
+        String email = "remove_" + java.util.UUID.randomUUID() + "@example.invalid";
+        mockMvc.perform(post("/api/threats/subscribe").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"" + email + "\"}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(delete("/api/threats/unsubscribe").param("email", email))
+                .andExpect(status().isOk());
+        org.junit.jupiter.api.Assertions.assertFalse(subscriptions.existsByEmail(email));
+    }
+
 }

@@ -61,3 +61,41 @@ async def scan_image(file: UploadFile = File(...), pipeline: ClassifierPipeline 
     except Exception as e:
         log.error("Image scan failed: %s", str(e))
         raise HTTPException(status_code=500, detail="Image analysis failed")
+
+from pydantic import BaseModel, Field, field_validator
+from urllib.parse import urlsplit
+
+class ShieldUrlRequest(BaseModel):
+    url: str = Field(min_length=8, max_length=2048)
+
+    @field_validator("url")
+    @classmethod
+    def valid_url(cls, value):
+        parsed = urlsplit(value)
+        if parsed.scheme not in ("http", "https") or not parsed.hostname:
+            raise ValueError("An absolute HTTP or HTTPS URL is required")
+        return value
+
+class ShieldTextRequest(BaseModel):
+    text: str = Field(min_length=3, max_length=2000)
+
+async def shield_result(value, pipeline):
+    result = await asyncio.to_thread(pipeline.scan, ScanRequest(input_text=value[:2000]))
+    score = max(0, min(100, result.risk_score))
+    reasons = list(result.indicators)
+    if result.explanation:
+        reasons.append(result.explanation)
+    if "fallback" in result.classifier_used or "rule_based" in result.classifier_used:
+        reasons.append("Local classification; verify unfamiliar requests independently")
+    return ApiResponse.success_response({
+        "verdict": "DANGEROUS" if score >= 70 else "SUSPICIOUS" if score >= 30 else "SAFE",
+        "score": score, "reasons": reasons, "category": result.threat_type,
+    })
+
+@router.post("/url")
+async def shield_url(request: ShieldUrlRequest, pipeline=Depends(get_pipeline_dependency)):
+    return await shield_result(request.url, pipeline)
+
+@router.post("/text")
+async def shield_text(request: ShieldTextRequest, pipeline=Depends(get_pipeline_dependency)):
+    return await shield_result(request.text, pipeline)

@@ -23,8 +23,13 @@ public class JwtUtil {
     }
 
     public String generateToken(String username) {
+        return generateToken(username, "USER");
+    }
+
+    public String generateToken(String username, String role) {
         return Jwts.builder()
                 .subject(username)
+                .claim("role", role)
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + expirationMs))
                 .signWith(getSigningKey())
@@ -38,6 +43,11 @@ public class JwtUtil {
         } catch (Exception e) {
             return false;
         }
+    }
+
+    public String extractRole(String token) {
+        String role = Jwts.parser().verifyWith(getSigningKey()).build().parseSignedClaims(token).getPayload().get("role", String.class);
+        return "ADMIN".equals(role) ? "ADMIN" : "USER";
     }
 
     public String extractUsername(String token) {

@@ -49,6 +49,9 @@ public interface ThreatRepository extends JpaRepository<Threat, UUID>, JpaSpecif
             "ORDER BY CAST(t.createdAt AS LocalDate) ASC")
     List<TrendDTO> findTrends(@Param("since") Instant since);
 
+    @Query("SELECT t.rawText FROM Threat t WHERE t.severity >= 4 ORDER BY t.createdAt DESC")
+    List<String> findHighSeverityTexts(Pageable pageable);
+
     Page<Threat> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
     List<Threat> findTop50ByOrderByCreatedAtDesc();

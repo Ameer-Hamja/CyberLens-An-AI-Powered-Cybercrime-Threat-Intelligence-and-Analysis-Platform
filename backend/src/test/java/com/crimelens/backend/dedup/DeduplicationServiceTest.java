@@ -41,6 +41,8 @@ class DeduplicationServiceTest {
 
         assertTrue(result.isAccepted());
         assertEquals("hash123", result.getContentHash());
+        verify(bloomFilterService, never()).add("hash123");
+        deduplicationService.markForwarded("hash123");
         verify(bloomFilterService).add("hash123");
         assertEquals(1.0, meterRegistry.counter("dedup.events.new").count());
     }

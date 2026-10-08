@@ -27,3 +27,22 @@ def test_scan_suspicious_url():
 def test_scan_validates_empty_input():
     response = client.post("/scan", json={"input_text": "   "})
     assert response.status_code == 422
+
+def test_shield_url_contract():
+    response = client.post('/scan/url', json={'url': 'https://example.com'})
+    assert response.status_code == 200
+    data = response.json()['data']
+    assert data['verdict'] in {'SAFE', 'SUSPICIOUS', 'DANGEROUS'}
+    assert 0 <= data['score'] <= 100
+    assert isinstance(data['reasons'], list)
+    assert data['category']
+
+def test_shield_text_contract():
+    response = client.post('/scan/text', json={'text': 'Your bank KYC has expired. Share your OTP urgently.'})
+    assert response.status_code == 200
+    data = response.json()['data']
+    assert data['score'] >= 30
+    assert data['reasons']
+
+def test_shield_url_rejects_non_http():
+    assert client.post('/scan/url', json={'url':'javascript:alert(1)'}).status_code == 422

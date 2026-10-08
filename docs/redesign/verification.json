@@ -1,0 +1,110 @@
+{
+  "checks": [
+    "dark routes, responsive bounds and accessibility audited",
+    "light routes, responsive bounds and accessibility audited",
+    "Incident category filter, pagination, drawer, detail API",
+    "Real text scam analysis and risk gauge",
+    "Report validation, four steps, download, honest unsubmitted status",
+    "Awareness guide and accessible modal",
+    "UI registration, automatic login, token storage and logout",
+    "390px mobile layouts, bottom navigation and More menu"
+  ],
+  "consoleIssues": [],
+  "accessibility": [
+    {
+      "page": "dashboard",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "page": "heatmap",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "page": "incidents",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "page": "scam-checker",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "page": "report",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "page": "awareness",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "page": "trends",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "page": "search",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "page": "dashboard",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "page": "heatmap",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "page": "incidents",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "page": "scam-checker",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "page": "report",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "page": "awareness",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "page": "trends",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "page": "search",
+      "theme": "light",
+      "violations": []
+    }
+  ],
+  "repeatableBrowserSuite": {
+    "command": "npm run test:browser",
+    "baseURL": "http://localhost:3000",
+    "passed": 8,
+    "failed": 0
+  },
+  "lintPassed": true,
+  "productionBuildPassed": true,
+  "composeSmokeTestPassed": true,
+  "notificationContrastRegression": {
+    "darkMode": true,
+    "lightMode": true,
+    "fullScreenMap": true,
+    "dismissal": true
+  }
+}

@@ -19,6 +19,7 @@ import java.util.stream.Collectors;
 public class ElasticsearchQueryService {
 
     private final ElasticsearchOperations elasticsearchOperations;
+    private final com.crimelens.backend.repository.ThreatRepository threatRepository;
 
     public List<ThreatDocument> search(String query, String threatType, String state, int page, int size) {
         try {
@@ -33,10 +34,10 @@ public class ElasticsearchQueryService {
                                         )
                                 );
                                 if (threatType != null && !threatType.isEmpty()) {
-                                    b.filter(f -> f.term(t -> t.field("threatType.keyword").value(threatType)));
+                                    b.filter(f -> f.term(t -> t.field("threatType").value(threatType)));
                                 }
                                 if (state != null && !state.isEmpty()) {
-                                    b.filter(f -> f.term(t -> t.field("geoTags.keyword").value(state)));
+                                    b.filter(f -> f.term(t -> t.field("geoTags").value(state)));
                                 }
                                 return b;
                             })
@@ -45,13 +46,31 @@ public class ElasticsearchQueryService {
                     .build();
 
             SearchHits<ThreatDocument> hits = elasticsearchOperations.search(searchQuery, ThreatDocument.class);
-            return hits.stream()
-                    .map(SearchHit::getContent)
-                    .collect(Collectors.toList());
+            if (hits.isEmpty()) return databaseSearch(query, threatType, state, page, size);
+            return hits.stream().map(SearchHit::getContent).collect(Collectors.toList());
         } catch (Exception e) {
-            log.error("ES search failed: {}", e.getMessage());
-            return Collections.emptyList();
+            log.warn("ES search unavailable; using database: {}", e.getMessage());
+            return databaseSearch(query, threatType, state, page, size);
         }
+    }
+
+    private List<ThreatDocument> databaseSearch(String query, String threatType, String state, int page, int size) {
+        org.springframework.data.jpa.domain.Specification<com.crimelens.backend.entity.Threat> spec = (root, criteria, cb) ->
+                cb.like(cb.lower(root.get("rawText")), "%" + query.toLowerCase(java.util.Locale.ROOT) + "%");
+        if (threatType != null && !threatType.isBlank()) {
+            spec = spec.and(com.crimelens.backend.repository.ThreatSpecification.hasType(
+                    com.crimelens.backend.entity.ThreatType.valueOf(threatType.toUpperCase(java.util.Locale.ROOT))));
+        }
+        if (state != null && !state.isBlank()) {
+            spec = spec.and((root, criteria, cb) -> {
+                var subquery = criteria.subquery(java.util.UUID.class);
+                var location = subquery.from(com.crimelens.backend.entity.ThreatLocation.class);
+                subquery.select(location.get("threat").get("id")).where(cb.equal(location.get("stateName"), state));
+                return root.get("id").in(subquery);
+            });
+        }
+        return threatRepository.findAll(spec, PageRequest.of(Math.max(0, page), Math.max(1, Math.min(100, size))))
+                .stream().map(ThreatDocument::from).toList();
     }
 
     public List<ThreatDocument> findSimilar(java.util.UUID threatId, int limit) {
@@ -87,7 +106,7 @@ public class ElasticsearchQueryService {
                     .withQuery(q -> q.matchAll(ma -> ma))
                     .withAggregation("by_type",
                             co.elastic.clients.elasticsearch._types.aggregations.Aggregation.of(a -> a
-                                    .terms(t -> t.field("threatType.keyword").size(50))))
+                                    .terms(t -> t.field("threatType").size(50))))
                     .withMaxResults(0)
                     .build();
 

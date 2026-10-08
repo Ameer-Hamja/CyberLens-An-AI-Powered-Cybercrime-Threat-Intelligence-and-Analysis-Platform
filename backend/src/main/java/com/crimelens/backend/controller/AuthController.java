@@ -80,6 +80,27 @@ public class AuthController {
     // UserDetailsService and PasswordEncoder might be needed if custom login logic is added later
     private final UserDetailsService userDetailsService;
     private final PasswordEncoder passwordEncoder;
+    private final com.crimelens.backend.repository.AppUserRepository users;
+
+    public record RegistrationRequest(
+            @jakarta.validation.constraints.NotBlank
+            @jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9_]{3,100}") String username,
+            @jakarta.validation.constraints.NotBlank
+            @jakarta.validation.constraints.Size(min = 12, max = 72) String password) {}
+
+    @PostMapping("/register")
+    public ResponseEntity<ApiResponse<String>> register(@Valid @RequestBody RegistrationRequest request) {
+        if ("admin".equalsIgnoreCase(request.username()) || users.existsById(request.username())) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.error("Username already exists"));
+        }
+        try {
+            users.saveAndFlush(new com.crimelens.backend.entity.AppUser(request.username(),
+                    passwordEncoder.encode(request.password()), "USER"));
+            return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Registered successfully"));
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.error("Username already exists"));
+        }
+    }
 
     @Operation(summary = "Login and get JWT token")
     @PostMapping("/login")
@@ -89,13 +110,14 @@ public class AuthController {
                     new UsernamePasswordAuthenticationToken(
                             request.getUsername(), request.getPassword()));
                             
-            String token = jwtUtil.generateToken(request.getUsername());
+            String role = auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN")) ? "ADMIN" : "USER";
+            String token = jwtUtil.generateToken(request.getUsername(), role);
             
             LoginResponseDTO response = new LoginResponseDTO(
                     token,
                     Instant.now().plusMillis(86400000).toString(),
                     request.getUsername(),
-                    "ADMIN"
+                    role
             );
             
             return ResponseEntity.ok(ApiResponse.success(response));

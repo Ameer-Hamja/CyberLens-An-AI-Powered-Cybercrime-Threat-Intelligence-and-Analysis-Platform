@@ -47,7 +47,7 @@ public class TwitterApiClient {
             log.warn("Twitter rate limit hit, backing off");
             return Collections.emptyList();
         } catch (Exception e) {
-            log.error("Error fetching tweets from Twitter API", e);
+            log.warn("Twitter API unavailable: {}", e.getMessage());
             return Collections.emptyList();
         }
     }

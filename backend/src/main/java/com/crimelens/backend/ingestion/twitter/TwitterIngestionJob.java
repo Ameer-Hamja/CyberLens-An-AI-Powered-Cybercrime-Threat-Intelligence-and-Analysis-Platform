@@ -25,6 +25,7 @@ public class TwitterIngestionJob {
     private final TwitterApiClient twitterApiClient;
     private final IngestionPublisher publisher;
     private final IngestionMetrics metrics;
+    private final com.crimelens.backend.ingestion.MockSourceFallback fallback;
 
     private Instant lastFetchedAt = Instant.now().minus(1, ChronoUnit.HOURS);
 
@@ -34,6 +35,7 @@ public class TwitterIngestionJob {
         try {
             metrics.recordJobExecution(SourceType.TWITTER);
             List<TwitterTweetData> tweets = twitterApiClient.searchRecentTweets(lastFetchedAt);
+            if (tweets.isEmpty()) { fallback.publish(SourceType.TWITTER); return; }
             int count = 0;
 
             for (TwitterTweetData tweet : tweets) {
@@ -64,6 +66,7 @@ public class TwitterIngestionJob {
             lastFetchedAt = Instant.now();
             log.info("Successfully fetched and published {} tweets", count);
         } catch (Exception e) {
+            fallback.publish(SourceType.TWITTER);
             log.error("Error during Twitter ingestion job execution", e);
         }
     }

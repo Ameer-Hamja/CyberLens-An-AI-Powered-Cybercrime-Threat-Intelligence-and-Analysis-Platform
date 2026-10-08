@@ -46,14 +46,14 @@ public class DeduplicationService {
             log.debug("Duplicate event discarded: hash={}, source={}", hash, event.getSourceType());
             return DeduplicationResult.duplicate(hash);
         } else {
-            try {
-                bloomFilterService.add(hash);
-            } catch (Exception e) {
-                log.warn("Bloom filter add threw exception for hash {}: {}", hash, e.getMessage());
-            }
             newCounter.increment();
             log.debug("New event accepted: hash={}, source={}", hash, event.getSourceType());
             return DeduplicationResult.accepted(hash);
         }
     }
+    public void markForwarded(String hash) {
+        try { bloomFilterService.add(hash); }
+        catch (Exception e) { log.warn("Bloom update failed after delivery: {}", e.getMessage()); }
+    }
+
 }

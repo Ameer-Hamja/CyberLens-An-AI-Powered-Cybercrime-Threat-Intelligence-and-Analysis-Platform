@@ -36,18 +36,30 @@ public class SecurityConfig {
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.GET,
-                    "/api/threats/**", "/api/stats/**", "/api/health",
+                    "/api/alerts/recent", "/api/incidents/**", "/api/threats/**", "/api/stats/**", "/api/health",
                     "/api/auth/**", "/api/scan/history",
                     "/ws/**", "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**",
                     "/actuator/health", "/actuator/prometheus").permitAll()
                 .requestMatchers(HttpMethod.POST,
-                    "/api/scan", "/api/scan/image",
+                    "/api/scan", "/api/scan/image", "/api/scan/url", "/api/scan/text",
                     "/api/threats/subscribe",
-                    "/api/auth/login", "/api/auth/logout").permitAll()
+                    "/api/auth/register", "/api/auth/login", "/api/auth/logout").permitAll()
                 .requestMatchers(HttpMethod.DELETE,
                     "/api/threats/unsubscribe").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/reports").authenticated()
                 .anyRequest().hasRole("ADMIN")
             )
+            .exceptionHandling(errors -> errors
+                .authenticationEntryPoint((request, response, error) -> {
+                    response.setStatus(401);
+                    response.setContentType("application/json");
+                    response.getWriter().write("{\"success\":false,\"error\":\"Authentication required\"}");
+                })
+                .accessDeniedHandler((request, response, error) -> {
+                    response.setStatus(403);
+                    response.setContentType("application/json");
+                    response.getWriter().write("{\"success\":false,\"error\":\"Access denied\"}");
+                }))
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
@@ -65,11 +77,15 @@ public class SecurityConfig {
 
     @Bean
     public UserDetailsService userDetailsService(PasswordEncoder passwordEncoder,
-            @Value("${ADMIN_PASSWORD:admin123}") String adminPassword) {
-        var admin = User.withUsername("admin")
-                .password(passwordEncoder.encode(adminPassword))
-                .roles("ADMIN")
-                .build();
-        return new InMemoryUserDetailsManager(admin);
+            com.crimelens.backend.repository.AppUserRepository users,
+            @Value("${ADMIN_PASSWORD}") String adminPassword) {
+        return username -> {
+            if ("admin".equals(username)) {
+                return User.withUsername("admin").password(passwordEncoder.encode(adminPassword)).roles("ADMIN").build();
+            }
+            var user = users.findById(username).orElseThrow(() ->
+                    new org.springframework.security.core.userdetails.UsernameNotFoundException(username));
+            return User.withUsername(user.getUsername()).password(user.getPasswordHash()).roles(user.getRole()).build();
+        };
     }
 }

@@ -26,12 +26,13 @@ public class ThreatPersistenceService {
     private final ElasticsearchIndexService elasticsearchIndexService;
     private final ObjectMapper objectMapper;
 
+    @org.springframework.cache.annotation.CacheEvict(cacheNames = {"threats-live", "threats-heatmap", "threats-trends", "threats-summary", "stats", "stats-by-type", "stats-by-state"}, allEntries = true)
     public Threat persist(ClassificationResponse response) {
         Threat threat = new Threat();
         threat.setSourceUrl(response.getSourceUrl());
         threat.setRawText(truncate(response.getRawText(), 5000));
         threat.setThreatType(ThreatType.valueOf(response.getThreatType()));
-        threat.setSeverity(response.getSeverity());
+        threat.setSeverity(response.getSeverity() == null ? 1 : Math.max(1, Math.min(5, response.getSeverity())));
         threat.setConfidence(response.getConfidence());
         threat.setDetectedLanguage(response.getDetectedLanguage());
         threat.setCitizenExplanation(response.getCitizenExplanation());

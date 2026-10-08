@@ -22,6 +22,7 @@ public class CybercrimeGovIngestionJob {
     private final CybercrimeGovScraper scraper;
     private final IngestionPublisher publisher;
     private final IngestionMetrics metrics;
+    private final com.crimelens.backend.ingestion.MockSourceFallback fallback;
 
     @Scheduled(fixedDelayString = "${ingestion.cybercrimeGov.fixedDelay:1800000}",
                initialDelayString = "${ingestion.cybercrimeGov.initialDelay:20000}")
@@ -29,6 +30,7 @@ public class CybercrimeGovIngestionJob {
         try {
             metrics.recordJobExecution(SourceType.CYBERCRIME_GOV);
             List<ScrapedPage> pages = scraper.scrapeAdvisories();
+            if (pages.isEmpty()) { fallback.publish(SourceType.CYBERCRIME_GOV); return; }
             int count = 0;
 
             for (ScrapedPage page : pages) {
@@ -50,6 +52,7 @@ public class CybercrimeGovIngestionJob {
             }
             log.info("Successfully fetched and published {} events from Cybercrime.gov.in", count);
         } catch (Exception e) {
+            fallback.publish(SourceType.CYBERCRIME_GOV);
             log.error("Error during Cybercrime.gov.in ingestion job execution", e);
         }
     }

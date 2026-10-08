@@ -1,2 +1,0 @@
-import clsx from 'clsx'; import { getThreatColor } from '../../utils/threatColors'; import { formatThreatType } from '../../utils/formatters'
-export default function ThreatTypeBadge({type,size='sm'}){const c=getThreatColor(type),s={xs:'px-1.5 py-0.5 text-[10px]',sm:'px-2 py-0.5 text-xs',md:'px-2.5 py-1 text-sm'};return <span className={clsx('badge border',c.bg,c.text,c.border,s[size])}>{formatThreatType(type)}</span>}

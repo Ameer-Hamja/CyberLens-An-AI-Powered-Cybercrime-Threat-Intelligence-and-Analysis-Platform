@@ -22,6 +22,7 @@ public class CorsConfig {
                 "http://localhost:5173",
                 frontendUrl
         ));
+        config.setAllowedOriginPatterns(List.of("chrome-extension://*", "moz-extension://*"));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setExposedHeaders(List.of(

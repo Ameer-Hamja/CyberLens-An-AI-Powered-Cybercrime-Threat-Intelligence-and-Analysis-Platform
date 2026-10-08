@@ -69,11 +69,14 @@ public class RawThreatForwarder {
             response = stubClassify(event, contentHash);
         }
         if (response != null) {
+            if (event.getRawText() != null && event.getRawText().startsWith("[Synthetic")) {
+                response.setCitizenExplanation("[Synthetic example] " + response.getCitizenExplanation());
+            }
             try {
                 String json = objectMapper.writeValueAsString(response);
-                kafkaTemplate.send(KafkaTopics.CLASSIFIED_THREATS, contentHash, json);
+                kafkaTemplate.send(KafkaTopics.CLASSIFIED_THREATS, contentHash, json).get(10, java.util.concurrent.TimeUnit.SECONDS);
             } catch (Exception e) {
-                log.error("Failed to serialize or publish classified response: {}", e.getMessage());
+                throw new IllegalStateException("Failed to publish classified response", e);
             }
         }
     }
@@ -104,7 +107,8 @@ public class RawThreatForwarder {
                 .severity(3)
                 .confidence(0.5)
                 .detectedLanguage("en")
-                .geoTags(List.of("India"))
+                .geoTags(com.crimelens.backend.pipeline.GeoCoordinates.STATE_COORDS.keySet().stream()
+                        .filter(state -> text.contains(state.toLowerCase())).toList())
                 .citizenExplanation("Potential " + type.name().replace("_", " ").toLowerCase() + " threat detected. Exercise caution.")
                 .contentHash(contentHash)
                 .sourceUrl(event.getSourceUrl())

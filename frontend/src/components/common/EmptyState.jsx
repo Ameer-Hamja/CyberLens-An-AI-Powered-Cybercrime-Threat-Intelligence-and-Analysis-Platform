@@ -1,2 +1,0 @@
-import { ShieldOff } from 'lucide-react'
-export default function EmptyState({title='No data found',description='Nothing to display yet.',icon:Icon=ShieldOff}){return <div className="flex flex-col items-center justify-center gap-3 py-14 text-center"><div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-800"><Icon className="h-6 w-6 text-slate-600"/></div><p className="text-sm font-medium text-slate-400">{title}</p><p className="max-w-xs text-xs text-slate-600">{description}</p></div>}

@@ -1,68 +1,126 @@
-import { useEffect, useState } from 'react'
-import clsx from 'clsx'
-
-const RADIUS = 54
-const CIRCUMFERENCE = 2 * Math.PI * RADIUS
-
-function getRiskColor(score) {
-  if (score >= 80) return { stroke: '#e24b4a', text: 'text-red-400', label: 'Critical Risk', bg: 'bg-red-500/10' }
-  if (score >= 60) return { stroke: '#ef9f27', text: 'text-orange-400', label: 'High Risk', bg: 'bg-orange-500/10' }
-  if (score >= 40) return { stroke: '#f59e0b', text: 'text-amber-400', label: 'Medium Risk', bg: 'bg-amber-500/10' }
-  return { stroke: '#10b981', text: 'text-emerald-400', label: 'Low Risk', bg: 'bg-emerald-500/10' }
-}
-
-export default function RiskMeter({ score = 0, animate = true }) {
-  const [displayed, setDisplayed] = useState(animate ? 0 : score)
-  const colors = getRiskColor(displayed)
-
+import { useEffect, useState } from "react";
+import clsx from "clsx";
+export default function RiskMeter({
+  score = 0,
+  pending = false,
+  empty = false,
+}) {
+  const [displayed, setDisplayed] = useState(0);
   useEffect(() => {
-    if (!animate) { setDisplayed(score); return }
-    let start = null
-    const duration = 900
-    const from = 0
-    const to = score
-    const step = (timestamp) => {
-      if (!start) start = timestamp
-      const progress = Math.min((timestamp - start) / duration, 1)
-      const eased = 1 - Math.pow(1 - progress, 3)
-      setDisplayed(Math.round(from + (to - from) * eased))
-      if (progress < 1) requestAnimationFrame(step)
+    const target = Math.min(100, Math.max(0, Number(score) || 0));
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setDisplayed(target);
+      return;
     }
-    requestAnimationFrame(step)
-  }, [score, animate])
-
-  const dashOffset = CIRCUMFERENCE - (displayed / 100) * CIRCUMFERENCE
-
+    let frame, start;
+    function step(timestamp) {
+      start ??= timestamp;
+      const progress = Math.min((timestamp - start) / 900, 1);
+      setDisplayed(Math.round(target * (1 - Math.pow(1 - progress, 3))));
+      if (progress < 1) frame = requestAnimationFrame(step);
+    }
+    frame = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frame);
+  }, [score]);
+  const color =
+    displayed >= 80
+      ? "#f87171"
+      : displayed >= 60
+        ? "#fb923c"
+        : displayed >= 40
+          ? "#fbbf24"
+          : "#34d399";
+  const label =
+    displayed >= 80
+      ? "Critical risk"
+      : displayed >= 60
+        ? "High risk"
+        : displayed >= 40
+          ? "Moderate risk"
+          : "Low risk";
   return (
-    <div className="flex flex-col items-center gap-3">
-      <div className="relative w-36 h-36">
-        <svg width="144" height="144" viewBox="0 0 144 144" className="-rotate-90">
-          <circle cx="72" cy="72" r={RADIUS} fill="none" stroke="#1e293b" strokeWidth="12" />
-          <circle
-            cx="72" cy="72" r={RADIUS}
-            fill="none" stroke={colors.stroke}
-            strokeWidth="12" strokeLinecap="round"
-            strokeDasharray={CIRCUMFERENCE}
-            strokeDashoffset={dashOffset}
-            style={{ transition: 'stroke-dashoffset 0.05s linear' }}
-          />
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className={clsx('text-3xl font-bold tabular-nums leading-none', colors.text)}>
-            {displayed}
-          </span>
-          <span className="text-xs text-slate-500 mt-0.5">/100</span>
-        </div>
-      </div>
-      <span className={clsx(
-        'px-3 py-1 rounded-full text-xs font-medium border',
-        colors.bg, colors.text,
-        colors.stroke === '#10b981' ? 'border-emerald-500/30'
-        : colors.stroke === '#e24b4a' ? 'border-red-500/30'
-        : 'border-amber-500/30'
-      )}>
-        {colors.label}
-      </span>
+    <div
+      className="relative mx-auto w-full max-w-64"
+      role="img"
+      aria-label={
+        pending
+          ? "Analyzing risk"
+          : empty
+            ? "Awaiting analysis"
+            : `Risk score ${score} out of 100, ${label}`
+      }
+    >
+      <svg viewBox="0 0 240 160" className="w-full">
+        <path
+          d="M 24 120 A 96 96 0 0 1 216 120"
+          fill="none"
+          className="stroke-slate-100 dark:stroke-slate-800"
+          strokeWidth="12"
+          strokeLinecap="round"
+        />
+        <path
+          d="M 24 120 A 96 96 0 0 1 216 120"
+          fill="none"
+          stroke={empty || pending ? "#06b6d4" : color}
+          strokeWidth="12"
+          strokeLinecap="round"
+          strokeDasharray="301.6"
+          strokeDashoffset={
+            301.6 - (pending ? 0.5 : empty ? 0 : displayed / 100) * 301.6
+          }
+          className={pending ? "animate-pulse" : ""}
+        />
+        <text
+          x="120"
+          y="99"
+          textAnchor="middle"
+          className="fill-slate-900 font-mono text-[38px] font-medium dark:fill-white"
+        >
+          {pending ? "…" : empty ? "—" : displayed}
+        </text>
+        <text
+          x="120"
+          y="123"
+          textAnchor="middle"
+          className="fill-slate-600 dark:fill-slate-400 font-mono text-[10px]"
+        >
+          RISK SCORE / 100
+        </text>
+        <text
+          x="24"
+          y="150"
+          textAnchor="middle"
+          className="fill-slate-600 dark:fill-slate-400 font-mono text-[9px]"
+        >
+          0
+        </text>
+        <text
+          x="216"
+          y="150"
+          textAnchor="middle"
+          className="fill-slate-600 dark:fill-slate-400 font-mono text-[9px]"
+        >
+          100
+        </text>
+      </svg>
+      <p
+        className={clsx(
+          "text-center text-xs font-medium",
+          empty || pending
+            ? "text-slate-600 dark:text-slate-400"
+            : displayed >= 60
+              ? "text-red-600 dark:text-red-400"
+              : displayed >= 40
+                ? "text-amber-700 dark:text-amber-400"
+                : "text-emerald-700 dark:text-emerald-400",
+        )}
+      >
+        {pending
+          ? "Analyzing the signals…"
+          : empty
+            ? "Your analysis will appear here"
+            : label}
+      </p>
     </div>
-  )
+  );
 }

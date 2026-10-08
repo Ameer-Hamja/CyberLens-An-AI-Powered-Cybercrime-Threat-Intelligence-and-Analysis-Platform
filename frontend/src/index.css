@@ -1,7 +1,92 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-@layer base { * { box-sizing:border-box } body { @apply min-h-screen bg-slate-950 text-slate-100 font-sans antialiased; background-image:radial-gradient(ellipse at 20% 20%,rgba(24,95,165,.13),transparent 45%),radial-gradient(ellipse at 90% 90%,rgba(226,75,74,.05),transparent 40%) } ::-webkit-scrollbar{width:5px;height:5px} ::-webkit-scrollbar-track{@apply bg-slate-900} ::-webkit-scrollbar-thumb{@apply rounded-full bg-slate-600} }
-@layer components { .card{@apply rounded-xl border border-slate-800 bg-slate-900/90 shadow-sm} .card-header{@apply flex items-center justify-between border-b border-slate-800 px-4 py-3} .stat-value{@apply text-2xl font-semibold tabular-nums text-white} .stat-label{@apply text-xs font-medium uppercase tracking-wider text-slate-500} .badge{@apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium} .btn-primary{@apply rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400/50} .btn-ghost{@apply rounded-lg px-3 py-1.5 text-sm text-slate-400 transition-colors hover:bg-slate-800 hover:text-white focus:outline-none focus:ring-2 focus:ring-slate-600} .input{@apply w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder-slate-500 transition-colors focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400} }
-.leaflet-container{background:#0f172a!important;border-radius:12px}.leaflet-tile-pane{filter:brightness(.6) saturate(.3)}.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:#1e293b!important;color:#f1f5f9!important}.leaflet-popup-content-wrapper{border:1px solid #334155!important;border-radius:8px!important}
+@layer base {
+  * {
+    @apply box-border;
+  }
+  html {
+    @apply bg-slate-50 text-slate-900 antialiased;
+    color-scheme: light;
+  }
+  html.dark {
+    @apply bg-slate-950 text-slate-100;
+    color-scheme: dark;
+  }
+  body {
+    @apply m-0 min-w-[320px] font-sans;
+  }
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950;
+  }
+  button,
+  a {
+    @apply touch-manipulation;
+  }
+  ::selection {
+    @apply bg-cyan-500/30;
+  }
+  ::-webkit-scrollbar {
+    @apply h-1.5 w-1.5;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-slate-300 dark:bg-slate-700;
+  }
+}
+@layer components {
+  .card {
+    @apply rounded-2xl border border-slate-200/90 bg-white/80 shadow-sm backdrop-blur-xl transition-colors duration-200 dark:border-slate-800 dark:bg-slate-900/65 dark:shadow-black/10;
+  }
+  .card-header {
+    @apply flex items-center justify-between gap-4 border-b border-slate-200 px-6 py-4 dark:border-slate-800;
+  }
+  .input {
+    @apply min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 transition-colors focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500 dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-100 dark:placeholder-slate-500;
+  }
+  .btn-primary {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-cyan-500 px-4 py-2.5 text-sm font-semibold text-slate-950 transition-colors hover:bg-cyan-400 disabled:opacity-40;
+  }
+  .btn-ghost {
+    @apply inline-flex min-h-9 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-600 transition-colors hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white;
+  }
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium dark:border-slate-700;
+  }
+  .stat-value {
+    @apply font-mono text-3xl font-semibold tabular-nums text-slate-900 dark:text-white;
+  }
+  .stat-label {
+    @apply text-xs font-medium tracking-wide text-slate-600 dark:text-slate-400;
+  }
+  .field-label {
+    @apply mb-2 block text-xs font-medium text-slate-600 dark:text-slate-300;
+  }
+}
+.leaflet-container {
+  @apply z-0 bg-slate-100 font-sans dark:bg-slate-950;
+}
+.leaflet-control-attribution {
+  @apply !bg-white/90 !text-[9px] dark:!bg-slate-900/90 dark:!text-slate-600 dark:text-slate-400;
+}
+.leaflet-control-zoom a {
+  @apply !border-slate-200 !bg-white !text-slate-800 dark:!border-slate-700 dark:!bg-slate-900 dark:!text-slate-200;
+}
+.leaflet-tooltip {
+  @apply !rounded-lg !border-slate-200 !bg-white !text-slate-900 !shadow-lg dark:!border-slate-700 dark:!bg-slate-900 dark:!text-slate-100;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+.dark-map-tiles {
+  filter: invert(1) hue-rotate(180deg) brightness(0.75) saturate(0.65);
+}

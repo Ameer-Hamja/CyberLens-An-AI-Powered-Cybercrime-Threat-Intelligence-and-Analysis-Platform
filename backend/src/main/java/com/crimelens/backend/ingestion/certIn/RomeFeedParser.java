@@ -26,17 +26,14 @@ public class RomeFeedParser {
 
     public List<SyndEntry> parse(String feedUrl) {
         try {
-            SyndFeedInput input = new SyndFeedInput();
-            SyndFeed feed = input.build(new XmlReader(new URL(feedUrl)));
-            return feed.getEntries();
-        } catch (MalformedURLException e) {
-            log.error("Malformed feed URL: {}", feedUrl, e);
-            return Collections.emptyList();
-        } catch (FeedException e) {
-            log.error("Failed to parse feed from URL: {}", feedUrl, e);
-            return Collections.emptyList();
+            var connection = new URL(feedUrl).openConnection();
+            connection.setConnectTimeout(5000);
+            connection.setReadTimeout(5000);
+            try (var reader = new XmlReader(connection)) {
+                return new SyndFeedInput().build(reader).getEntries();
+            }
         } catch (Exception e) {
-            log.error("Unexpected error fetching feed from URL: {}", feedUrl, e);
+            log.warn("CERT-In feed unavailable at {}: {}", feedUrl, e.getMessage());
             return Collections.emptyList();
         }
     }

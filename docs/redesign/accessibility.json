@@ -1,0 +1,82 @@
+[
+  {
+    "page": "dashboard",
+    "theme": "dark",
+    "violations": []
+  },
+  {
+    "page": "heatmap",
+    "theme": "dark",
+    "violations": []
+  },
+  {
+    "page": "incidents",
+    "theme": "dark",
+    "violations": []
+  },
+  {
+    "page": "scam-checker",
+    "theme": "dark",
+    "violations": []
+  },
+  {
+    "page": "report",
+    "theme": "dark",
+    "violations": []
+  },
+  {
+    "page": "awareness",
+    "theme": "dark",
+    "violations": []
+  },
+  {
+    "page": "trends",
+    "theme": "dark",
+    "violations": []
+  },
+  {
+    "page": "search",
+    "theme": "dark",
+    "violations": []
+  },
+  {
+    "page": "dashboard",
+    "theme": "light",
+    "violations": []
+  },
+  {
+    "page": "heatmap",
+    "theme": "light",
+    "violations": []
+  },
+  {
+    "page": "incidents",
+    "theme": "light",
+    "violations": []
+  },
+  {
+    "page": "scam-checker",
+    "theme": "light",
+    "violations": []
+  },
+  {
+    "page": "report",
+    "theme": "light",
+    "violations": []
+  },
+  {
+    "page": "awareness",
+    "theme": "light",
+    "violations": []
+  },
+  {
+    "page": "trends",
+    "theme": "light",
+    "violations": []
+  },
+  {
+    "page": "search",
+    "theme": "light",
+    "violations": []
+  }
+]

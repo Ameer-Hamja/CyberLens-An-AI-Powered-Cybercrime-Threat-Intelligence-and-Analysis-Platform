@@ -172,18 +172,19 @@ public class AdminController {
 
     @Operation(summary = "Manually trigger data ingestion")
     @PostMapping("/ingest/trigger")
-    public ApiResponse<String> triggerIngest(@RequestParam SourceType sourceType) {
+    public ApiResponse<String> triggerIngest(@RequestParam SourceType sourceType,
+            @RequestParam(defaultValue = "Maharashtra") String state) {
         try {
             ThreatRawEvent testEvent = ThreatRawEvent.builder()
                     .sourceUrl("https://test.crimelens.in/manual-" + UUID.randomUUID())
-                    .rawText("Test ingestion triggered by admin for source: " + sourceType)
+                    .rawText("[Synthetic manual ingestion] " + state + ": Phishing bank SMS requests OTP and login credentials. Reference " + UUID.randomUUID())
                     .title("Manual test event")
                     .sourceType(sourceType)
                     .publishedAt(Instant.now())
                     .metadata(Map.of("trigger", "admin", "admin_id", "system"))
                     .build();
                     
-            kafkaTemplate.send(KafkaTopics.RAW_THREATS, objectMapper.writeValueAsString(testEvent));
+            kafkaTemplate.send(KafkaTopics.RAW_THREATS, objectMapper.writeValueAsString(testEvent)).get(10, java.util.concurrent.TimeUnit.SECONDS);
             return ApiResponse.success("Test event published to raw-threats topic");
         } catch (Exception e) {
             log.error("Failed to publish test event: {}", e.getMessage());

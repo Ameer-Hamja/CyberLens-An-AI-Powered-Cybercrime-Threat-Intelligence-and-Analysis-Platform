@@ -1,0 +1,10 @@
+import {it,expect,vi,beforeEach} from 'vitest';
+const {session,config}=vi.hoisted(()=>({session:{token:'session-test-token',tokenBackend:'https://backend.example'},config:{backendUrl:'https://backend.example'}}));
+vi.mock('webextension-polyfill',()=>({default:{storage:{session:{get:vi.fn(async()=>session),remove:vi.fn()}}}}));
+vi.mock('./settings',()=>({settings:vi.fn(async()=>config)}));
+import {request} from './api';
+beforeEach(()=>{vi.unstubAllGlobals();session.tokenBackend='https://backend.example';});
+it('unwraps the existing API envelope',async()=>{vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({success:true,data:{value:1}}))));expect(await request('/api/stats/summary')).toEqual({value:1});});
+it('never forwards a JWT to a different backend',async()=>{session.tokenBackend='https://old.example';const fetcher=vi.fn(async()=>new Response('{}'));vi.stubGlobal('fetch',fetcher);await request('/api/stats/summary');expect((fetcher.mock.calls[0] as unknown as [string,RequestInit])[1].headers).not.toHaveProperty('Authorization');});
+it('does not retry rate-limited requests',async()=>{const fetcher=vi.fn(async()=>new Response('{}',{status:429}));vi.stubGlobal('fetch',fetcher);await expect(request('/api/scan/url',{url:'https://example.com'})).rejects.toThrow('Rate limit');expect(fetcher).toHaveBeenCalledTimes(1);});
+it('retries temporary failures and exposes an offline state',async()=>{const fetcher=vi.fn(async()=>{throw Error('offline')});vi.stubGlobal('fetch',fetcher);await expect(request('/api/scan/url',{url:'https://example.com'})).rejects.toThrow('offline');expect(fetcher).toHaveBeenCalledTimes(2);});

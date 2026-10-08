@@ -76,13 +76,20 @@ public class ScanLogService {
     }
 
     private ScanResponseDTO fallbackScan(String text) {
+        String input = text.toLowerCase(java.util.Locale.ROOT);
+        String type = input.contains("otp") ? "OTP_THEFT" : input.contains("kyc") ? "KYC_SCAM"
+                : input.contains("upi") ? "UPI_FRAUD" : input.contains("phish") || input.contains("click") ? "PHISHING"
+                : input.contains("ransom") ? "RANSOMWARE" : "OTHER";
+        boolean suspicious = !"OTHER".equals(type);
         return ScanResponseDTO.builder()
-                .riskScore(50)
-                .threatType("OTHER")
-                .explanation("We were unable to fully analyze this input right now. Exercise caution and avoid sharing personal information.")
-                .isDangerous(false)
-                .indicators(List.of("Analysis service temporarily unavailable"))
-                .classifierUsed("fallback")
+                .riskScore(suspicious ? 70 : 50)
+                .threatType(type)
+                .explanation("AI analysis is temporarily unavailable. Local keyword checks "
+                        + (suspicious ? "found possible " + type.replace("_", " ").toLowerCase() + ". " : "cannot establish whether this input is safe. ")
+                        + "Do not share OTPs, credentials, or approve unexpected payments; verify through the official provider.")
+                .isDangerous(suspicious)
+                .indicators(List.of("AI unavailable; local keyword checks only"))
+                .classifierUsed("rule_based_fallback")
                 .processingTimeMs(0.0)
                 .build();
     }

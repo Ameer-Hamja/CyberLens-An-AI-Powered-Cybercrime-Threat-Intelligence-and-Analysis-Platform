@@ -94,7 +94,7 @@ import static java.util.stream.Collectors.summingLong;
  * GET  /v3/api-docs                   → OpenAPI JSON spec
  */
 @RestController
-@RequestMapping("/api/threats")
+@RequestMapping({"/api/threats", "/api/incidents"})
 @Slf4j
 @Tag(name = "Threats", description = "Threat intelligence endpoints")
 @RequiredArgsConstructor
@@ -107,7 +107,7 @@ public class ThreatController {
     private final MeterRegistry meterRegistry;
 
     @Operation(summary = "Get paginated live threat feed")
-    @GetMapping("/live")
+    @GetMapping({"", "/live"})
     @Cacheable(value = "threats-live", key = "#page + '-' + #size + '-' + #threatType + '-' + #minSeverity")
     public ApiResponse<PagedResponse<ThreatDTO>> getLiveThreats(
             @RequestParam(defaultValue = "0") int page,
@@ -115,7 +115,7 @@ public class ThreatController {
             @RequestParam(required = false) String threatType,
             @RequestParam(required = false) Integer minSeverity) {
 
-        if (size > 100) size = 100;
+        size = Math.max(1, Math.min(100, size));
         if (page < 0) page = 0;
 
         Specification<Threat> spec = Specification.where(null);
@@ -181,6 +181,9 @@ public class ThreatController {
             @RequestParam(required = false) String threatType,
             @RequestParam(required = false) String state) {
 
+        page = Math.max(0, page);
+        size = Math.max(1, Math.min(100, size));
+        if (threatType != null && !threatType.isBlank()) parseThreatType(threatType);
         String query = q.trim();
         if (query.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Search query cannot be blank");

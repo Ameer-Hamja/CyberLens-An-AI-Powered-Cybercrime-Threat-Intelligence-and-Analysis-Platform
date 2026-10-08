@@ -82,6 +82,7 @@ public class ScanController {
     private final RateLimiterService rateLimiterService;
     private final ScanLogRepository scanLogRepository;
     private final MeterRegistry meterRegistry;
+    private final org.springframework.web.client.RestTemplate restTemplate;
 
     @Operation(summary = "Scan suspicious text, URL, SMS, or UPI ID")
     @PostMapping
@@ -151,7 +152,6 @@ public class ScanController {
             org.springframework.http.HttpEntity<org.springframework.util.MultiValueMap<String, Object>> requestEntity =
                     new org.springframework.http.HttpEntity<>(body, headers);
 
-            org.springframework.web.client.RestTemplate restTemplate = new org.springframework.web.client.RestTemplate();
 
             ResponseEntity<String> response = restTemplate.exchange(
                     scanLogService.getAiServiceUrl() + "/scan/image",
@@ -160,7 +160,7 @@ public class ScanController {
                     String.class
             );
 
-            meterRegistry.counter("scan.requests.total", "type", "image").increment();
+            meterRegistry.counter("scan.image.requests.total", "type", "image").increment();
 
             com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
             Map<String, Object> respMap = mapper.readValue(response.getBody(), new com.fasterxml.jackson.core.type.TypeReference<>() {});
@@ -188,7 +188,7 @@ public class ScanController {
                 "totalScans", totalScans,
                 "dangerousScans", dangerousScans,
                 "safeScans", totalScans - dangerousScans,
-                "topThreatType", topThreatType
+                "topThreatType", topThreatType != null ? topThreatType : "OTHER"
         ));
     }
 
